@@ -46,7 +46,8 @@ vector<string> tokenizeInput(string input)
 class Process 
 {
 	string processName;
-	int id;
+	const int id;
+	static int nextId;
 	int core;
 	time_t timestamp;
 	bool finished;
@@ -54,20 +55,35 @@ class Process
 	int instructionPointer;
 
 public:	
-	void executeInstruction() {
+	Process(string name, int assignedCore) :
+		processName(name),
+		core(assignedCore),
+		id(nextId++),
+		timestamp(time(nullptr)),
+		finished(false),
+		instructionPointer(0)
+	{
+		cout << "Process created: " << processName
+			<< "(ID: " << id << ") on Core" << core << endl;
+	}
+
+	void executeInstruction() 
+	{
 		//implement please ><
 	}
 	
-
 	bool isFinished() const { return finished; }
 	string getName() const { return processName; }
 	int getId() const { return id; }
 	time_t getTimestamp() const { return timestamp; }
 };
 
+int Process::nextId = 0;
+
 enum SchedulerType { FCFS, RR };
 
-class Scheduler { 
+class Scheduler 
+{ 
 	vector<Process> readyQueue;
 	vector<Process> finished;
 	SchedulerType type;
@@ -76,7 +92,51 @@ class Scheduler {
 	int cpuCount;
 
 public:
-	void addProcess(Process p);
+	void addProcess(Process p) 
+	{
+		readyQueue.push_back(p);
+	}; 
+	void enterProcessScreen(Process p) 
+	{
+		string rawInput;
+		vector<string> cmd;
+		
+		//clear screen
+		//cout << "\033[2J\033[1;1H";
+
+		while(true) {
+			cout << "root:\\>";
+			getline(cin, rawInput);
+			cmd = tokenizeInput(rawInput);
+
+			if(cmd[0] == "process-smi") 
+			{
+				cout << endl;
+				cout << "Process name: " << p.getName() << endl;
+				cout << "ID: " << p.getId() << endl;
+				cout << "Logs:" << endl;
+				//implement ts ((timestamp) Core: N "instruction")
+				cout << "Current instruction Line: " << endl;
+				cout << "Lines of code: " << endl <<
+					endl;
+
+				if(p.isFinished()) 
+				{
+					cout << "Finished!" << endl <<
+						endl;
+				}
+			}
+			else if(cmd[0] == "exit") 
+			{
+				cout << "Returning home..." << endl;
+				break;
+			}
+			else 
+			{
+				cout << "Unknown command inside process screen." << endl;
+			}
+		}
+	}
 	void run();
 	void runFCFS();
 	void runRR();
@@ -84,6 +144,7 @@ public:
 
 class MainController
 {
+	Scheduler scheduler;
 	string rawInput;
 	vector<string> cmd;
 	bool initialized;
@@ -106,8 +167,7 @@ public:
 			{
 				if (cmd[0] == "initialize")
 				{
-					cout << "initializing processor configuration..." << endl
-						 << endl;
+					cout << "initializing processor configuration..." << endl;
 					Config cfg;
 
 					if (cfg.loadFile())
@@ -123,14 +183,12 @@ public:
 				}
 				else if (cmd[0] == "exit")
 				{
-					cout << "exiting program..." << endl
-						 << endl;
+					cout << "exiting program..." << endl;
 					running = false;
 				}
 				else
 				{
-					cout << "Please initialize first!" << endl
-						 << endl;
+					cout << "Please initialize first!" << endl;
 				}
 			}
 
@@ -140,14 +198,23 @@ public:
 				{
 					if (cmd.size() == 1)
 					{
-						cout << "Missing argument after 'screen'" << endl
-							 << endl;
+						cout << "Missing argument after 'screen'" << endl;
 					}
 					else if (cmd[1] == "-s")
 					{
-						// clear contents
-						// create a new process
-						//"move" to process screen (possibly call a class for it)
+						if(cmd.size() == 2) 
+						{
+							cout << "Missing argument: Process Name" << endl;
+						}
+						else
+						{
+							Process pTemp(cmd[2], 0);
+							scheduler.addProcess(pTemp);
+							scheduler.enterProcessScreen(pTemp);
+						}
+					}
+					else if (cmd[1] == "-r")
+					{
 					}
 					else if (cmd[1] == "-ls")
 					{
@@ -168,14 +235,12 @@ public:
 				}
 				else if (cmd[0] == "exit")
 				{
-					cout << "exiting program..." << endl
-						 << endl;
+					cout << "exiting program..." << endl;
 					running = false;
 				}
 				else
 				{
-					cout << "Unknown command." << endl
-						 << endl;
+					cout << "Unknown command." << endl;
 				}
 			}
 		}
