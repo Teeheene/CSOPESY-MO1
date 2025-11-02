@@ -6,6 +6,7 @@
 #include <thread>
 #include <chrono>
 #include <ctime> 
+#include <unordered_map>
 #include "initialize.hpp"
 using namespace std;
 
@@ -43,6 +44,28 @@ vector<string> tokenizeInput(string input)
 	return tokens;
 }
 
+struct Variable
+{
+	uint16_t value;
+};
+
+enum InstructionType
+{
+	PRINT,
+	DECLARE,
+	ADD,
+	SUBTRACT,
+	SLEEP,
+	FOR
+};
+
+struct Instruction
+{
+	InstructionType type;
+	std::vector<std::string> args;
+	std::vector<Instruction> subinstructions;
+};
+
 class Process 
 {
 	string processName;
@@ -51,7 +74,8 @@ class Process
 	int core;
 	time_t timestamp;
 	bool finished;
-	vector<string> instructions;
+	vector<Instruction> instructions;
+	unordered_map<string, Variable> vars;
 	int instructionPointer;
 
 public:	
@@ -67,15 +91,35 @@ public:
 			<< "(ID: " << id << ") on Core" << core << endl;
 	}
 
-	void executeInstruction() 
+	void executeInstruction(Instruction &instr)
 	{
-		//implement please ><
+		switch (instr.type)
+		{
+		case DECLARE:
+			vars[instr.args[0]].value = getValue(instr.args[1]);
+			break;
+		case ADD:
+			vars[instr.args[0]].value = getValue(instr.args[1]) + getValue(instr.args[2]);
+			break;
+		case SUBTRACT:
+			vars[instr.args[0]].value = getValue(instr.args[1]) - getValue(instr.args[2]);
+			break;
+		}
 	}
-	
+
+
 	bool isFinished() const { return finished; }
 	string getName() const { return processName; }
 	int getId() const { return id; }
 	time_t getTimestamp() const { return timestamp; }
+
+private:
+	uint16_t getValue(std::string &token)
+	{
+		if (vars.count(token))
+			return vars[token].value;
+		return static_cast<uint16_t>(std::stoi(token));
+	}
 };
 
 int Process::nextId = 0;
@@ -98,16 +142,16 @@ public:
 	}; 
 	void enterProcessScreen(Process p) 
 	{
-		string rawInput;
+		string raInput;
 		vector<string> cmd;
 		
 		//clear screen
 		//cout << "\033[2J\033[1;1H";
 
 		while(true) {
-			cout << "root:\\>";
-			getline(cin, rawInput);
-			cmd = tokenizeInput(rawInput);
+			cout << "root:\\> ";
+			getline(cin, raInput);
+			cmd = tokenizeInput(raInput);
 
 			if(cmd[0] == "process-smi") 
 			{
@@ -133,7 +177,7 @@ public:
 			}
 			else 
 			{
-				cout << "Unknown command inside process screen." << endl;
+				cout << "Unknon command inside process screen." << endl;
 			}
 		}
 	}
@@ -145,7 +189,7 @@ public:
 class MainController
 {
 	Scheduler scheduler;
-	string rawInput;
+	string raInput;
 	vector<string> cmd;
 	bool initialized;
 
@@ -160,8 +204,8 @@ public:
 		while (running)
 		{
 			cout << "root:\\> ";
-			getline(cin, rawInput);
-			cmd = tokenizeInput(rawInput);
+			getline(cin, raInput);
+			cmd = tokenizeInput(raInput);
 
 			if (!initialized)
 			{
