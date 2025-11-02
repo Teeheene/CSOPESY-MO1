@@ -5,6 +5,7 @@
 #include <string>
 #include <thread>
 #include <chrono>
+#include <ctime> 
 #include "initialize.hpp"
 using namespace std;
 
@@ -16,10 +17,10 @@ atomic<bool> running(true);
  * @param input - the string input of the user
  * @returns vector<string> - dynamic array of tokens
  * */
-std::vector<std::string> tokenizeInput(std::string input)
+vector<string> tokenizeInput(string input)
 {
-	std::vector<std::string> tokens;
-	std::string token{""};
+	vector<std::string> tokens;
+	string token{""};
 
 	if (input.empty())
 		return {};
@@ -27,7 +28,7 @@ std::vector<std::string> tokenizeInput(std::string input)
 	for (char ch : input)
 	{
 		// if its not a space
-		if (!std::isspace(static_cast<unsigned char>(ch)))
+		if (!isspace(static_cast<unsigned char>(ch)))
 		{
 			token += ch;
 		}
@@ -41,6 +42,45 @@ std::vector<std::string> tokenizeInput(std::string input)
 
 	return tokens;
 }
+
+class Process 
+{
+	string processName;
+	int id;
+	int core;
+	time_t timestamp;
+	bool finished;
+	vector<string> instructions;
+	int instructionPointer;
+
+public:	
+	void executeInstruction() {
+		//implement please ><
+	}
+	
+
+	bool isFinished() const { return finished; }
+	string getName() const { return processName; }
+	int getId() const { return id; }
+	time_t getTimestamp() const { return timestamp; }
+};
+
+enum SchedulerType { FCFS, RR };
+
+class Scheduler { 
+	vector<Process> readyQueue;
+	vector<Process> finished;
+	SchedulerType type;
+	int quantum;
+	int currentTick;
+	int cpuCount;
+
+public:
+	void addProcess(Process p);
+	void run();
+	void runFCFS();
+	void runRR();
+};
 
 class MainController
 {
