@@ -21,6 +21,11 @@ bool Config::loadFile()
 {
     std::ifstream file;
     file.open("config.txt");
+	 if (!file.is_open()) {
+        std::cerr << "[Error] Could not open config.txt" << std::endl;
+        return false;
+    }
+
 
     std::string text;
 
