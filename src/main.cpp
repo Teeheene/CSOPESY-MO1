@@ -5,9 +5,10 @@
 #include <string>
 #include <thread>
 #include <chrono>
-#include <ctime> 
+#include <ctime>
 #include <optional>
 #include <unordered_map>
+#include <random>
 #include "initialize.hpp"
 using namespace std;
 
@@ -67,15 +68,15 @@ struct Instruction
 	std::vector<Instruction> subinstructions;
 };
 
-struct Log 
+struct Log
 {
 	time_t timestamp;
 	int instructionLine;
 	string display;
-	//formulate this shit
+	// formulate this shit
 };
 
-class Process 
+class Process
 {
 	string processName;
 	int id;
@@ -87,14 +88,24 @@ class Process
 	int instructionPointer;
 	vector<Log> logs;
 
-public:	
-	Process(string name, int assignedCore) :
-		processName(name),
-		core(assignedCore),
-		id(nextId++),
-		finished(false),
-		instructionPointer(0)
-	{}
+public:
+	Process(string name, int assignedCore) : processName(name),
+											 core(assignedCore),
+											 id(nextId++),
+											 finished(false),
+											 instructionPointer(0)
+	{
+	}
+	Process(string name, int assignedCore, int minIns, int maxIns) : processName(name),
+																	 core(assignedCore),
+																	 id(nextId++),
+																	 finished(false),
+																	 instructionPointer(0)
+	{
+		generateRandomInstructions(minIns, maxIns);
+	}
+
+	void setFinished(bool val) { finished = val; }
 
 	void executeInstruction(Instruction &instr)
 	{
@@ -112,7 +123,6 @@ public:
 		}
 	}
 
-
 	bool isFinished() const { return finished; }
 	string getName() const { return processName; }
 	int getId() const { return id; }
@@ -120,6 +130,58 @@ public:
 	int getInstructionSize() const { return instructions.size(); }
 
 private:
+	void generateRandomInstructions(int minIns, int maxIns)
+	{
+		srand(0);
+
+		long long int numInstr = rand() % (maxIns - (minIns + 1)) + minIns;
+
+		vector<std::string> varNames = {"var1", "var2", "var3", "var4"};
+
+		for (const auto &varName : varNames)
+		{
+			int randomValue = rand() % 101;
+			instructions.push_back({DECLARE, {varName, std::to_string(randomValue)}});
+		}
+
+		int remainingInstructions = numInstr - varNames.size();
+		if (remainingInstructions <= 0)
+			return;
+
+		for (int i = 0; i < remainingInstructions; ++i)
+		{
+			Instruction instr;
+			int type = rand() % 6;
+
+			string v1 = varNames[rand() % varNames.size()];
+			string v2 = varNames[rand() % varNames.size()];
+			string v3_val = std::to_string(rand() % 101); // 0-100
+
+			switch (type)
+			{
+			case 0: // PRINT
+				instr = {PRINT, {"Hello world from "}};
+				break;
+			case 1: // DECLARE
+				instr = {DECLARE, {v1, v3_val}};
+				break;
+			case 2: // ADD
+				instr = {ADD, {v1, v2, v3_val}};
+				break;
+			case 3: // SUBTRACT
+				instr = {SUBTRACT, {v1, v2, std::to_string(rand() % 11)}};
+				break;
+			case 4: // SLEEP
+				instr = {SLEEP, {std::to_string((rand() % 5) + 1)}};
+				break;
+			case 5: // FOR
+				instr = {FOR, {std::to_string((rand() % 3) + 2)}};
+				instr.subinstructions.push_back({ADD, {v1, v1, "1"}});
+				break;
+			}
+			instructions.push_back(instr);
+		}
+	}
 	uint16_t getValue(std::string &token)
 	{
 		if (vars.count(token))
@@ -129,86 +191,106 @@ private:
 };
 int Process::nextId = 0;
 
+enum SchedulerType
+{
+	FCFS,
+	RR
+};
 
-enum SchedulerType { FCFS, RR };
-
-class Scheduler 
-{ 
+class Scheduler
+{
 	vector<Process> readyQueue;
 	vector<Process> finished;
-	int currentTick;
+	atomic<int> currentTick{0};
 	mutex mtx;
 
-	//configured
+	// configured
 	SchedulerType type;
 	int quantum;
 	int batchFreq;
 	int minIns;
 	int maxIns;
 	int delayExec;
+	int numCores;
+
+	thread schedulerThread;
+	vector<std::thread> coreThreads;
+
+	atomic<bool> generatingProcesses{false};
+	atomic<bool> runningCores{false};
+	atomic<int> nextProcessId{0};
 
 public:
-	Scheduler() :
-		currentTick(0),
-		type(SchedulerType::FCFS),
-		quantum(5),
-		batchFreq(1),
-		minIns(1000),
-		maxIns(2000),
-		delayExec(0)
-	{}
+	Scheduler() : currentTick(0),
+				  type(SchedulerType::FCFS),
+				  quantum(5),
+				  batchFreq(1),
+				  minIns(1000),
+				  maxIns(2000),
+				  delayExec(0)
+	{
+	}
 
-	Scheduler(Config cfg) :
-		currentTick(0),
-		type(cfg.scheduler == "rr" ? SchedulerType::RR : SchedulerType::FCFS),
-		quantum(cfg.quantumCycles),
-		batchFreq(cfg.batchFreq),
-		minIns(cfg.minIns),
-		maxIns(cfg.maxIns),
-		delayExec(cfg.delayExec)
-	{}
+	Scheduler(Config cfg) : currentTick(0),
+							type(cfg.scheduler == "rr" ? SchedulerType::RR : SchedulerType::FCFS),
+							quantum(cfg.quantumCycles),
+							batchFreq(cfg.batchFreq),
+							minIns(cfg.minIns),
+							maxIns(cfg.maxIns),
+							delayExec(cfg.delayExec),
+							numCores(cfg.numcpu)
+	{
+	}
 
-	//pushes process into ready queue
-	void addProcess(Process p) 
+	~Scheduler()
+	{
+		stopGeneration();
+	}
+
+	// pushes process into ready queue
+	void addProcess(Process p)
 	{
 		lock_guard<mutex> lock(mtx);
 		readyQueue.push_back(p);
-	}; 
+	};
 
-	//removes process at the front of ready queue and returns it
-	optional<Process> getNextProcess() {
+	// removes process at the front of ready queue and returns it
+	optional<Process> getNextProcess()
+	{
 		lock_guard<mutex> lock(mtx);
-		if(readyQueue.empty()) return nullopt;
+		if (readyQueue.empty())
+			return nullopt;
 		Process p = readyQueue.front();
 		readyQueue.erase(readyQueue.begin());
 		return p;
 	}
 
-	//marks the process finished (more like puts it in the finished queue)
-	void markFinished(Process &p) {
+	// marks the process finished (more like puts it in the finished queue)
+	void markFinished(Process &p)
+	{
 		lock_guard<mutex> lock(mtx);
 		finished.push_back(p);
 	}
 
-	//checks for readyqueue if its still working
+	// checks for readyqueue if its still working
 	bool hasWork()
 	{
 		lock_guard<mutex> lock(mtx);
 		return !(readyQueue.empty());
 	}
 
-	void FCFS(int coreId) 
+	void FCFS(int coreId)
 	{
-		while(true)
+		while (true)
 		{
 			optional<Process> tempProcess = getNextProcess();
-			if(!tempProcess.has_value()) break;
+			if (!tempProcess.has_value())
+				break;
 			Process process = tempProcess.value();
 
-			while(!process.isFinished())
+			while (!process.isFinished())
 			{
-				//execute instruction logic
-				
+				// execute instruction logic
 				this_thread::sleep_for(chrono::milliseconds(delayExec));
 			}
 
@@ -216,63 +298,116 @@ public:
 		}
 	}
 
-	void enterProcessScreen(Process p) 
+	void enterProcessScreen(Process p)
 	{
 		string rawInput;
 		vector<string> cmd;
-		
-		//clear screen
-		//cout << "\033[2J\033[1;1H";
 
-		while(true) {
+		// clear screen
+		// cout << "\033[2J\033[1;1H";
+
+		while (true)
+		{
 			cout << "root:\\> ";
 			getline(cin, rawInput);
 			cmd = tokenizeInput(rawInput);
 
-			if(cmd[0] == "process-smi") 
+			if (cmd[0] == "process-smi")
 			{
 				cout << endl;
 				cout << "Process name: " << p.getName() << endl;
 				cout << "ID: " << p.getId() << endl;
 				cout << "Logs:" << endl;
-				//implement ts ((timestamp) Core: N "instruction")
+				// implement ts ((timestamp) Core: N "instruction")
 				cout << "Current instruction Line: " << p.getCurrentInstructionLine() << endl;
-				cout << "Lines of code: " << p.getInstructionSize() << endl <<
-					endl;
-				//when finished print finished type shi
+				cout << "Lines of code: " << p.getInstructionSize() << endl
+					 << endl;
+				// when finished print finished type shi
 			}
-			else if(cmd[0] == "exit") 
+			else if (cmd[0] == "exit")
 			{
 				cout << "Returning home..." << endl;
 				break;
 			}
-			else 
+			else
 			{
 				cout << "Unknon command inside process screen." << endl;
 			}
 		}
 	}
-	optional<Process> searchProcess(string processName) 
+	optional<Process> searchProcess(string processName)
 	{
-		for(const auto &process : readyQueue) 
+		for (const auto &process : readyQueue)
 		{
-			if(process.getName() == processName)
+			if (process.getName() == processName)
 			{
 				return process;
 			}
-		}	
+		}
 		return nullopt;
 	}
+	void startGeneration()
+	{
+		if (generatingProcesses)
+			return;
+
+		generatingProcesses = true;
+		runningCores = true;
+
+		schedulerThread = std::thread(&Scheduler::run, this);
+
+		cout << "Booting " << numCores << " CPU core(s)..." << endl;
+		for (int i = 0; i < numCores; i++)
+		{
+			if (type == SchedulerType::FCFS)
+			{
+				coreThreads.emplace_back(&Scheduler::FCFS, this, i);
+			}
+			else if (type == SchedulerType::RR)
+			{
+				// implement RR
+			}
+		}
+	}
+
+	void stopGeneration()
+	{
+		generatingProcesses = false;
+		runningCores = false;
+
+		if (schedulerThread.joinable())
+		{
+			schedulerThread.join();
+		}
+
+		for (auto &t : coreThreads)
+		{
+			if (t.joinable())
+			{
+				t.join();
+			}
+		}
+		coreThreads.clear();
+	}
+
 	void run()
 	{
-		while(true) 
+		while (generatingProcesses)
 		{
 			currentTick++;
-		}
-	};
-	void runFCFS() 
-	{
 
+			if (currentTick % batchFreq == 0)
+			{
+				int id = nextProcessId++;
+				string processName = "p" + to_string(id);
+
+				Process newProcess(processName, 0, minIns, maxIns);
+
+				addProcess(newProcess);
+			}
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
 	};
 	void runRR();
 };
@@ -309,7 +444,7 @@ public:
 					{
 						std::cout << "configuration loaded successfully.\n\n";
 						cfg.print();
-						//initializes the scheduler
+						// initializes the scheduler
 						scheduler = make_unique<Scheduler>(cfg);
 						initialized = true;
 					}
@@ -339,7 +474,7 @@ public:
 					}
 					else if (cmd[1] == "-s")
 					{
-						if(cmd.size() == 2) 
+						if (cmd.size() == 2)
 						{
 							cout << "Missing argument: Process Name" << endl;
 						}
@@ -352,14 +487,14 @@ public:
 					}
 					else if (cmd[1] == "-r")
 					{
-						if(cmd.size() == 2)
+						if (cmd.size() == 2)
 						{
 							cout << "Missing argument: Process Name" << endl;
 						}
 						else
 						{
 							optional<Process> pTemp = scheduler->searchProcess(cmd[2]);
-							if(pTemp)
+							if (pTemp)
 								scheduler->enterProcessScreen(*pTemp);
 							else
 								cout << "Process <" << cmd[2] << "> not found." << endl;
@@ -369,26 +504,33 @@ public:
 					{
 						cout << "CPU utilization: " << endl;
 						cout << "Cores used: " << endl;
-						cout << "Cores available: " << endl 
-							<< endl;
-						for(int i = 0; i <= 38; i++) { cout << "-"; }
+						cout << "Cores available: " << endl
+							 << endl;
+						for (int i = 0; i <= 38; i++)
+						{
+							cout << "-";
+						}
 						cout << endl;
 						cout << "Running processes: " << endl;
-						//call scheduler function to show all running
+						// call scheduler function to show all running
 						cout << endl;
-						cout << "Finished processes: " << endl; 
-						//call scheduler function to show all finished
-						for(int i = 0; i <= 38; i++) { cout << "-"; }
-						cout << endl << endl;
+						cout << "Finished processes: " << endl;
+						// call scheduler function to show all finished
+						for (int i = 0; i <= 38; i++)
+						{
+							cout << "-";
+						}
+						cout << endl
+							 << endl;
 					}
 				}
 				else if (cmd[0] == "scheduler-start")
 				{
-					// activate the thread for generating processes in the background
+					scheduler->startGeneration();
 				}
 				else if (cmd[0] == "scheduler-stop")
 				{
-					// stop generating dummy processes
+					scheduler->stopGeneration();
 				}
 				else if (cmd[0] == "report-util")
 				{
