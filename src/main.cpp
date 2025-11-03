@@ -90,17 +90,16 @@ class Process
 
 public:
 	Process(string name, int assignedCore) : processName(name),
-											 core(assignedCore),
-											 id(nextId++),
-											 finished(false),
-											 instructionPointer(0)
-	{
-	}
+		core(assignedCore),
+		id(nextId++),
+		finished(false),
+		instructionPointer(0)
+	{}
 	Process(string name, int assignedCore, int minIns, int maxIns) : processName(name),
-																	 core(assignedCore),
-																	 id(nextId++),
-																	 finished(false),
-																	 instructionPointer(0)
+		core(assignedCore),
+		id(nextId++),
+		finished(false),
+		instructionPointer(0)
 	{
 		generateRandomInstructions(minIns, maxIns);
 	}
@@ -222,25 +221,23 @@ class Scheduler
 
 public:
 	Scheduler() : currentTick(0),
-				  type(SchedulerType::FCFS),
-				  quantum(5),
-				  batchFreq(1),
-				  minIns(1000),
-				  maxIns(2000),
-				  delayExec(0)
-	{
-	}
+		type(SchedulerType::FCFS),
+		quantum(5),
+		batchFreq(1),
+		minIns(1000),
+		maxIns(2000),
+		delayExec(0)
+	{}
 
 	Scheduler(Config cfg) : currentTick(0),
-							type(cfg.scheduler == "rr" ? SchedulerType::RR : SchedulerType::FCFS),
-							quantum(cfg.quantumCycles),
-							batchFreq(cfg.batchFreq),
-							minIns(cfg.minIns),
-							maxIns(cfg.maxIns),
-							delayExec(cfg.delayExec),
-							numCores(cfg.numcpu)
-	{
-	}
+		type(cfg.scheduler == "rr" ? SchedulerType::RR : SchedulerType::FCFS),
+		quantum(cfg.quantumCycles),
+		batchFreq(cfg.batchFreq),
+		minIns(cfg.minIns),
+		maxIns(cfg.maxIns),
+		delayExec(cfg.delayExec),
+		numCores(cfg.numcpu)
+	{}
 
 	~Scheduler()
 	{
@@ -476,7 +473,7 @@ public:
 					{
 						if (cmd.size() == 2)
 						{
-							cout << "Missing argument: Process Name" << endl;
+							Process pTemp()
 						}
 						else
 						{
