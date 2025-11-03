@@ -193,8 +193,17 @@ public:
 
 		return nullopt;
 	}
-	void run();
-	void runFCFS();
+	void run()
+	{
+		while(true) 
+		{
+			currentTick++;
+		}
+	};
+	void runFCFS() 
+	{
+
+	};
 	void runRR();
 };
 
@@ -286,7 +295,19 @@ public:
 					}
 					else if (cmd[1] == "-ls")
 					{
-						// list all running processes
+						cout << "CPU utilization: " << endl;
+						cout << "Cores used: " << endl;
+						cout << "Cores available: " << endl 
+							<< endl;
+						for(int i = 0; i <= 38; i++) { cout << "-"; }
+						cout << endl;
+						cout << "Running processes: " << endl;
+						//call scheduler function to show all running
+						cout << endl;
+						cout << "Finished processes: " << endl; 
+						//call scheduler function to show all finished
+						for(int i = 0; i <= 38; i++) { cout << "-"; }
+						cout << endl << endl;
 					}
 				}
 				else if (cmd[0] == "scheduler-start")
