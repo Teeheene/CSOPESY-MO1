@@ -473,7 +473,7 @@ public:
 					{
 						if (cmd.size() == 2)
 						{
-							Process pTemp()
+							//to implement
 						}
 						else
 						{
@@ -521,7 +521,7 @@ public:
 							 << endl;
 					}
 				}
-				else if (cmd[0] == "scheduler-start")
+				else if (cmd[0] == "scheduler-start" || cmd[0] == "scheduler-test")
 				{
 					scheduler->startGeneration();
 				}
