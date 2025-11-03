@@ -67,24 +67,31 @@ struct Instruction
 	std::vector<Instruction> subinstructions;
 };
 
+struct Log 
+{
+	time_t timestamp;
+	int instructionLine;
+	string display;
+	//formulate this shit
+};
+
 class Process 
 {
 	string processName;
-	const int id;
+	int id;
 	static int nextId;
 	int core;
-	time_t timestamp;
 	bool finished;
 	vector<Instruction> instructions;
 	unordered_map<string, Variable> vars;
 	int instructionPointer;
+	vector<Log> logs;
 
 public:	
 	Process(string name, int assignedCore) :
 		processName(name),
 		core(assignedCore),
 		id(nextId++),
-		timestamp(time(nullptr)),
 		finished(false),
 		instructionPointer(0)
 	{}
@@ -109,7 +116,6 @@ public:
 	bool isFinished() const { return finished; }
 	string getName() const { return processName; }
 	int getId() const { return id; }
-	time_t getTimestamp() const { return timestamp; }
 	int getCurrentInstructionLine() const { return instructionPointer - instructions.size(); }
 	int getInstructionSize() const { return instructions.size(); }
 
@@ -121,8 +127,8 @@ private:
 		return static_cast<uint16_t>(std::stoi(token));
 	}
 };
-
 int Process::nextId = 0;
+
 
 enum SchedulerType { FCFS, RR };
 
@@ -130,16 +136,86 @@ class Scheduler
 { 
 	vector<Process> readyQueue;
 	vector<Process> finished;
+	int currentTick;
+	mutex mtx;
+
+	//configured
 	SchedulerType type;
 	int quantum;
-	int currentTick;
-	int cpuCount;
+	int batchFreq;
+	int minIns;
+	int maxIns;
+	int delayExec;
 
 public:
+	Scheduler() :
+		currentTick(0),
+		type(SchedulerType::FCFS),
+		quantum(5),
+		batchFreq(1),
+		minIns(1000),
+		maxIns(2000),
+		delayExec(0)
+	{}
+
+	Scheduler(Config cfg) :
+		currentTick(0),
+		type(cfg.scheduler == "rr" ? SchedulerType::RR : SchedulerType::FCFS),
+		quantum(cfg.quantumCycles),
+		batchFreq(cfg.batchFreq),
+		minIns(cfg.minIns),
+		maxIns(cfg.maxIns),
+		delayExec(cfg.delayExec)
+	{}
+
+	//pushes process into ready queue
 	void addProcess(Process p) 
 	{
+		lock_guard<mutex> lock(mtx);
 		readyQueue.push_back(p);
 	}; 
+
+	//removes process at the front of ready queue and returns it
+	optional<Process> getNextProcess() {
+		lock_guard<mutex> lock(mtx);
+		if(readyQueue.empty()) return nullopt;
+		Process p = readyQueue.front();
+		readyQueue.erase(readyQueue.begin());
+		return p;
+	}
+
+	//marks the process finished (more like puts it in the finished queue)
+	void markFinished(Process &p) {
+		lock_guard<mutex> lock(mtx);
+		finished.push_back(p);
+	}
+
+	//checks for readyqueue if its still working
+	bool hasWork()
+	{
+		lock_guard<mutex> lock(mtx);
+		return !(readyQueue.empty());
+	}
+
+	void FCFS(int coreId) 
+	{
+		while(true)
+		{
+			optional<Process> tempProcess = getNextProcess();
+			if(!tempProcess.has_value()) break;
+			Process process = tempProcess.value();
+
+			while(!process.isFinished())
+			{
+				//execute instruction logic
+				
+				this_thread::sleep_for(chrono::milliseconds(delayExec));
+			}
+
+			markFinished(process);
+		}
+	}
+
 	void enterProcessScreen(Process p) 
 	{
 		string rawInput;
@@ -163,12 +239,7 @@ public:
 				cout << "Current instruction Line: " << p.getCurrentInstructionLine() << endl;
 				cout << "Lines of code: " << p.getInstructionSize() << endl <<
 					endl;
-
-				if(p.isFinished()) 
-				{
-					cout << "Finished!" << endl <<
-						endl;
-				}
+				//when finished print finished type shi
 			}
 			else if(cmd[0] == "exit") 
 			{
@@ -190,7 +261,6 @@ public:
 				return process;
 			}
 		}	
-
 		return nullopt;
 	}
 	void run()
@@ -209,7 +279,7 @@ public:
 
 class MainController
 {
-	Scheduler scheduler;
+	unique_ptr<Scheduler> scheduler;
 	string rawInput;
 	vector<string> cmd;
 	bool initialized;
@@ -232,13 +302,15 @@ public:
 			{
 				if (cmd[0] == "initialize")
 				{
-					cout << "initializing processor configuration..." << endl;
 					Config cfg;
+					cout << "initializing processor configuration..." << endl;
 
 					if (cfg.loadFile())
 					{
 						std::cout << "configuration loaded successfully.\n\n";
 						cfg.print();
+						//initializes the scheduler
+						scheduler = make_unique<Scheduler>(cfg);
 					}
 					else
 					{
@@ -274,8 +346,8 @@ public:
 						else
 						{
 							Process pTemp(cmd[2], 0);
-							scheduler.addProcess(pTemp);
-							scheduler.enterProcessScreen(pTemp);
+							scheduler->addProcess(pTemp);
+							scheduler->enterProcessScreen(pTemp);
 						}
 					}
 					else if (cmd[1] == "-r")
@@ -286,9 +358,9 @@ public:
 						}
 						else
 						{
-							optional<Process> pTemp = scheduler.searchProcess(cmd[2]);
+							optional<Process> pTemp = scheduler->searchProcess(cmd[2]);
 							if(pTemp)
-								scheduler.enterProcessScreen(*pTemp);
+								scheduler->enterProcessScreen(*pTemp);
 							else
 								cout << "Process <" << cmd[2] << "> not found." << endl;
 						}
