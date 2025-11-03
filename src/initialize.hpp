@@ -148,5 +148,5 @@ void Config::print() const
     std::cout << "batchFreq: " << batchFreq << "\n";
     std::cout << "minIns: " << minIns << "\n";
     std::cout << "maxIns: " << maxIns << "\n";
-    std::cout << "delayExec: " << delayExec << "\n";
+    std::cout << "delayExec: " << delayExec << "\n\n";
 }

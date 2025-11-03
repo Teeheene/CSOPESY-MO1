@@ -6,6 +6,7 @@
 #include <thread>
 #include <chrono>
 #include <ctime> 
+#include <optional>
 #include <unordered_map>
 #include "initialize.hpp"
 using namespace std;
@@ -86,10 +87,7 @@ public:
 		timestamp(time(nullptr)),
 		finished(false),
 		instructionPointer(0)
-	{
-		cout << "Process created: " << processName
-			<< "(ID: " << id << ") on Core" << core << endl;
-	}
+	{}
 
 	void executeInstruction(Instruction &instr)
 	{
@@ -112,6 +110,8 @@ public:
 	string getName() const { return processName; }
 	int getId() const { return id; }
 	time_t getTimestamp() const { return timestamp; }
+	int getCurrentInstructionLine() const { return instructionPointer - instructions.size(); }
+	int getInstructionSize() const { return instructions.size(); }
 
 private:
 	uint16_t getValue(std::string &token)
@@ -142,7 +142,7 @@ public:
 	}; 
 	void enterProcessScreen(Process p) 
 	{
-		string raInput;
+		string rawInput;
 		vector<string> cmd;
 		
 		//clear screen
@@ -150,8 +150,8 @@ public:
 
 		while(true) {
 			cout << "root:\\> ";
-			getline(cin, raInput);
-			cmd = tokenizeInput(raInput);
+			getline(cin, rawInput);
+			cmd = tokenizeInput(rawInput);
 
 			if(cmd[0] == "process-smi") 
 			{
@@ -160,8 +160,8 @@ public:
 				cout << "ID: " << p.getId() << endl;
 				cout << "Logs:" << endl;
 				//implement ts ((timestamp) Core: N "instruction")
-				cout << "Current instruction Line: " << endl;
-				cout << "Lines of code: " << endl <<
+				cout << "Current instruction Line: " << p.getCurrentInstructionLine() << endl;
+				cout << "Lines of code: " << p.getInstructionSize() << endl <<
 					endl;
 
 				if(p.isFinished()) 
@@ -181,6 +181,18 @@ public:
 			}
 		}
 	}
+	optional<Process> searchProcess(string processName) 
+	{
+		for(const auto &process : readyQueue) 
+		{
+			if(process.getName() == processName)
+			{
+				return process;
+			}
+		}	
+
+		return nullopt;
+	}
 	void run();
 	void runFCFS();
 	void runRR();
@@ -189,7 +201,7 @@ public:
 class MainController
 {
 	Scheduler scheduler;
-	string raInput;
+	string rawInput;
 	vector<string> cmd;
 	bool initialized;
 
@@ -204,8 +216,8 @@ public:
 		while (running)
 		{
 			cout << "root:\\> ";
-			getline(cin, raInput);
-			cmd = tokenizeInput(raInput);
+			getline(cin, rawInput);
+			cmd = tokenizeInput(rawInput);
 
 			if (!initialized)
 			{
@@ -259,6 +271,18 @@ public:
 					}
 					else if (cmd[1] == "-r")
 					{
+						if(cmd.size() == 2)
+						{
+							cout << "Missing argument: Process Name" << endl;
+						}
+						else
+						{
+							optional<Process> pTemp = scheduler.searchProcess(cmd[2]);
+							if(pTemp)
+								scheduler.enterProcessScreen(*pTemp);
+							else
+								cout << "Process <" << cmd[2] << "> not found." << endl;
+						}
 					}
 					else if (cmd[1] == "-ls")
 					{
