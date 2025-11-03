@@ -311,12 +311,12 @@ public:
 						cfg.print();
 						//initializes the scheduler
 						scheduler = make_unique<Scheduler>(cfg);
+						initialized = true;
 					}
 					else
 					{
 						std::cerr << "failed to load configuration.\n\n";
 					}
-					initialized = true;
 				}
 				else if (cmd[0] == "exit")
 				{
