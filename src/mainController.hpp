@@ -36,7 +36,7 @@ public:
 						cfg.print();
 						// initializes the scheduler
 						scheduler.configure(cfg);
-						scheduler.startScheduler();
+						scheduler.start();
 						//initialize instructions
 						minIns = cfg.minIns;
 						maxIns = cfg.maxIns;
@@ -74,12 +74,12 @@ public:
 					{
 						if (cmd.size() == 2)
 						{
-							scheduler.addProcess(createRandomProcess(pid++, minIns, maxIns));
+							scheduler.addProcess(createRandomProcess(pid++));
 							//to implement
 						}
 						else
 						{
-							scheduler.addProcess(createRandomProcess(pid++, minIns, maxIns, cmd[2]));
+							scheduler.addProcess(createRandomProcess(pid++));
 							//scheduler->enterProcessScreen(pTemp);
 						}
 					}
@@ -91,11 +91,12 @@ public:
 						}
 						else
 						{
-							if(scheduler.processExists(cmd[2]))
+							/*if(scheduler.processExists(cmd[2]))
 								cout << "tbi" << endl;
 								//scheduler->enterProcessScreen(*pTemp);
 							else
 								cout << "Process <" << cmd[2] << "> not found." << endl;
+								*/
 						}
 					}
 					else if (cmd[1] == "-ls") {
@@ -104,11 +105,11 @@ public:
 				}
 				else if (cmd[0] == "scheduler-start" || cmd[0] == "scheduler-test")
 				{
-					scheduler.startTest();
+					//scheduler.startTest();
 				}
 				else if (cmd[0] == "scheduler-stop")
 				{
-					scheduler.stopTest();
+					//scheduler.stopTest();
 				}
 				else if (cmd[0] == "report-util")
 				{

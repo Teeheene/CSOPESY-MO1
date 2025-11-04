@@ -31,6 +31,25 @@ vector<string> tokenizeInput(string input)
 }
 
 //basic random process generator 
+unique_ptr<Process> createRandomProcess(int pid) {
+	static vector<string> ops = {"LOAD", "ADD", "SUB", "DECLARE"};
+	auto p = make_unique<Process>(pid);
+
+	srand(time(nullptr) + pid);
+	int len = rand() % 100 + 5; //about 5-14 instructions
+
+	for(int i = 0; i < len; i++) {
+		int index = rand() % ops.size();
+		p->addInstruction(ops[index]);
+	}
+
+	//returns the newly made process
+	return p;
+}
+
+
+/*
+//basic random process generator 
 unique_ptr<Process> createRandomProcess(int pid, int minIns, int maxIns, string name = "PROC-") {
 	static vector<string> ops = {"LOAD", "ADD", "SUB", "DECLARE"};
 	auto p = make_unique<Process>(name, pid);
@@ -40,7 +59,7 @@ unique_ptr<Process> createRandomProcess(int pid, int minIns, int maxIns, string 
 	int len = rand() % (maxIns - minIns + 1) + minIns; 
 
 	for(int i = 0; i < len; i++) {
-		/*Instruction ins = generateRandomInstruction();
+		/ *Instruction ins = generateRandomInstruction();
 		if(ins.isForLoop()) {
 			vector<Instruction> processedForLoop = processForLoop(ins);
 			for(auto &subIns : processedForLoop) {
@@ -49,7 +68,7 @@ unique_ptr<Process> createRandomProcess(int pid, int minIns, int maxIns, string 
 		}
 		else
 			p->addInstruction(ins);
-		*/
+		* /
 
 		//temporary
 		int index = rand() % ops.size();
@@ -60,3 +79,4 @@ unique_ptr<Process> createRandomProcess(int pid, int minIns, int maxIns, string 
 	//returns the newly made process
 	return p;
 }
+*/

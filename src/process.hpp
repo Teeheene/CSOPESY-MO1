@@ -11,32 +11,28 @@ struct Log {
 		instr = instr_;
 	}
 
-	string toString() {
+	void print() {
 		//get timestamp adjusted to local time
 		char strTime[100];
 		tm* translTimestamp = localtime(&timestamp);
 		strftime(strTime, sizeof(strTime), "%m/%d/%Y %I:%M:%S%p", translTimestamp);
 
 		//print the log details
-		return "(" + string(strTime) + ")" + " Core:" + to_string(core) 
-			+ " \"" + instr + "\"\n";
+		cout << "(" << strTime << ")" << " Core:" << core 
+			<< " \"" << instr << "\"" << endl;
 	}
 };
 
 class Process {
-	string name;
 	int pid;
 	int instructionPointer;
-	//vector<Instruction> instructions;
-	vector<string> instructions; //temporary for testing
+	vector<string> instructions;
 	vector<unique_ptr<Log>> logs;
-	//for shared processor resources 
-	mutex procMtx;
+	mutex logMtx;
 
 public:
-	Process(string name_, int pid_) :
-		name(name_),
-		pid(pid_),
+	Process(int id) :
+		pid(id),
 		instructionPointer(0)
 	{}
 
@@ -44,52 +40,89 @@ public:
 		instructionPointer(0)
 	{}
 
-	void addInstruction(string &instr) {
+	void addInstruction(const string &instr) {
 		instructions.push_back(instr);
 	}
 
 	bool hasRemainingInstructions() {
-		lock_guard<mutex> lock(procMtx);
 		return instructionPointer < instructions.size();
 	}
 
 	void executeNextInstruction(int core) {
-		lock_guard<mutex> lock(procMtx);
+		lock_guard<mutex> lock(logMtx);
 		if(!hasRemainingInstructions()) { return; }
-		//executeInstruction(instructions[instructionPointer]);
 
-		//logs ONLY output instructions (e.g. PRINT("meow"))
-		//temp
-		//if(Instruction.isOutput())
-		logs.push_back(make_unique<Log>(core, instructions[instructionPointer]/*.getOutput()*/));
+		//log the current instruction
+		logs.push_back(make_unique<Log>(core, instructions[instructionPointer]));
 
 		//move the pointer forward
 		instructionPointer++;
 	}
 
 	void printLogs() {
-		lock_guard<mutex> lock(procMtx);
+		lock_guard<mutex> lock(logMtx);
 		cout << "ID: " << pid << endl;
 		cout << "Logs:" << endl;
 		for(const auto& log : logs) {
-			cout << log->toString();
+			log->print();
 		}
 	}
-
-	string toStringLogs() {
-		lock_guard<mutex> lock(procMtx);
-		string result;
-		for(const auto& log : logs) {
-			result += log->toString();
-		}
-		return result;
-	}
-
 	
-	//getters
-	string getName() { return name; }
 	int getPid() { return pid; }
 	int getInstructionCount() { return instructions.size(); }
 	int getInstructionPointer() { return instructionPointer; }
 };
 
+
+
+/*
+class Process {
+	int pid;
+	int instructionPointer;
+	vector<string> instructions;
+	vector<unique_ptr<Log>> logs;
+	mutex logMtx;
+
+public:
+	Process(int id) :
+		pid(id),
+		instructionPointer(0)
+	{}
+
+	Process() :
+		instructionPointer(0)
+	{}
+
+	void addInstruction(const string &instr) {
+		instructions.push_back(instr);
+	}
+
+	bool hasRemainingInstructions() {
+		return instructionPointer < instructions.size();
+	}
+
+	void executeNextInstruction(int core) {
+		lock_guard<mutex> lock(logMtx);
+		if(!hasRemainingInstructions()) { return; }
+
+		//log the current instruction
+		logs.push_back(make_unique<Log>(core, instructions[instructionPointer]));
+
+		//move the pointer forward
+		instructionPointer++;
+	}
+
+	void printLogs() {
+		lock_guard<mutex> lock(logMtx);
+		cout << "ID: " << pid << endl;
+		cout << "Logs:" << endl;
+		for(const auto& log : logs) {
+			log->print();
+		}
+	}
+	
+	int getPid() { return pid; }
+	int getInstructionCount() { return instructions.size(); }
+	int getInstructionPointer() { return instructionPointer; }
+};
+*/

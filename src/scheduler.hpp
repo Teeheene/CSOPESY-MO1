@@ -11,6 +11,186 @@ struct Core {
 	{}
 };
 
+class Scheduler {
+	vector<unique_ptr<Core>> cores;	
+	vector<unique_ptr<Process>> readyQueue;
+	vector<unique_ptr<Process>> finished;
+	mutex mtx;
+
+	//cfg
+	int coreCount;
+	string mode;
+	int quantum;
+	int cpuCycle;
+	int freqDelay;
+	atomic<bool> stop;
+
+public:
+	Scheduler(int cCount = 0, string m = "fcfs", int q = 3, int delay = 2000) :
+		coreCount(cCount),
+		mode(m),
+		quantum(q),
+		freqDelay(delay),
+		cpuCycle(0),
+		stop(false)
+	{
+		/*cores.reserve(cCount);
+		for(int i = 0; i < coreCount; i++)
+			cores.emplace_back(make_unique<Core>(i)); //similar to push_back funct of vector
+																	*/
+	}
+
+	void configure(Config cfg) {
+		mode = cfg.scheduler;
+		quantum = cfg.quantumCycles;
+		freqDelay = cfg.delayExec;
+		coreCount = cfg.numcpu;
+
+		cores.reserve(coreCount);
+		for(int i = 0; i < coreCount; i++) {
+			cores.emplace_back(make_unique<Core>(i));
+		}
+	}
+
+	void addProcess(unique_ptr<Process> p) {
+		lock_guard<mutex> lock(mtx);
+		readyQueue.push_back(move(p));
+	}
+
+	optional<unique_ptr<Process>> getNextProcess() {
+		lock_guard<mutex> lock(mtx);
+		if(readyQueue.empty()) return nullopt;
+
+		auto p = move(readyQueue.front());
+		readyQueue.erase(readyQueue.begin());
+		return p;
+	}
+
+	void start() {
+		//threads for each core
+		for(auto &core : cores) {
+			//thread(...) in the background it will run the instr/ worker in the bg
+			//[this, &core] a lambad capt list, states which vars to use inside thread funct.
+			core->worker = thread([this, &core]() {
+				while(!stop) {
+					auto nextProc = getNextProcess();	
+					if(nextProc.has_value()) {
+						{
+							lock_guard<mutex> lock(core->coreMtx);
+							core->active = true;
+							core->current = move(nextProc.value());
+						}
+
+						//for limiting instruction time
+						int limit;
+						{
+							lock_guard<mutex> lock(core->coreMtx);
+							limit = (mode == "rr") 
+								? min(quantum, core->current->getInstructionCount()) 
+								: core->current->getInstructionCount();
+						}
+
+						//fcfs implementation (this runs to completion)
+						for(int i = 0; i < limit && !stop; i++) {
+							{
+								lock_guard<mutex> lock(core->coreMtx);
+								core->current->executeNextInstruction(core->id);
+							}
+							this_thread::sleep_for(chrono::milliseconds(freqDelay));
+						}
+						
+						//rr implementation later
+
+						{
+							lock_guard<mutex> lock(core->coreMtx);
+							lock_guard<mutex> lock2(mtx);
+							finished.push_back(move(core->current));
+						}
+
+						core->active = false;
+					} else {
+						this_thread::sleep_for(chrono::milliseconds(50));
+					}
+				} 
+			});
+			//end of thread
+		}
+	}
+
+	void stopScheduler() {
+		stop = true;
+		for(auto &core : cores) {
+			if(core->worker.joinable())
+				core->worker.join();
+		}
+		cout << "All cores stopped." << endl;
+	}
+
+	//debugging
+	void state() {
+		cout << "=============================" << endl;
+		cout << "Cycle: " << cpuCycle << endl;
+
+		for(auto &core : cores) {
+			//temporary values to store threaded core
+			int id;
+			Process* tempProcess;
+			bool isActive;
+
+			{
+				lock_guard<mutex> lock(core->coreMtx);
+				id = core->id;
+				tempProcess = core->current.get();
+				isActive = core->active;
+			}
+			if(isActive) {
+				cout << "[CORE " << id << "] Running Proc-" 
+					<< tempProcess->getPid() << " (" 
+					<< tempProcess->getInstructionPointer() << " / " 
+					<< tempProcess->getInstructionCount()
+					<< ")" << endl;
+			} else {
+				cout << "[CORE " << id << "] Idle" << endl;
+			}
+		}
+
+		{
+			lock_guard<mutex> lock(mtx);
+			cout << "Ready Queue: " << endl;
+			for(auto &proc : readyQueue) {
+				cout << "[PROC-" << proc->getPid() << "] Waiting..." << endl;
+			}
+			cout << "Finished Queue: " << endl;
+			for(auto &proc : finished) {
+				cout << "[PROC-" << proc->getPid() << "] Finished Running " 
+					<< proc->getInstructionCount() << " instructions." << endl;
+			}
+		}
+		cout << "=============================" << endl;
+	}
+
+	void searchProcess(int pid) {
+		lock_guard<mutex> lock(mtx);
+		for(auto &core : cores) {
+			lock_guard<mutex> lock(core->coreMtx);
+			if(core->current && core->current->getPid() == pid) {
+				cout << "PROC-" << pid << endl;
+				core->current->printLogs();
+			}
+		}
+	}
+
+	void simulate() {
+		while(!stop) {
+			cpuCycle++;
+			this_thread::sleep_for(chrono::milliseconds(100));
+		}
+	}
+};
+
+
+
+/*
 class Scheduler
 {
 	vector<unique_ptr<Core>> cores;
@@ -135,7 +315,7 @@ public:
 	}
 
 
-	/*
+	/ *
 	void startScheduler() {
 		//threads for each core
 		for(auto &core : cores) {
@@ -204,7 +384,7 @@ public:
 			//end of thread
 		}
 	}
-	*/
+	* /
 
 	void stopScheduler() {
 		stop = true;
@@ -240,7 +420,7 @@ public:
 	}
 
 	//debugging
-	/*
+	/ *
 	void state() {
 		struct CoreSnapshot{
 			//core snap
@@ -314,7 +494,7 @@ public:
 		for (int i = 0; i <= 38; i++) { cout << "-"; }
 		cout << endl;
 	}
-	*/
+	* /
 	//debugging
 	void state() {
 		cout << "=============================" << endl;
@@ -384,7 +564,7 @@ public:
 		return false;
 	}
 
-	/*
+	/ *
 	//processor screen
 	void enterProcessScreen(int pid)
 	{
@@ -423,7 +603,8 @@ public:
 			}
 		}
 	}
-	*/
-};
+	* /
+};*/
+
 
 
