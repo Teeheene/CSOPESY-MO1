@@ -9,6 +9,7 @@
 #include <optional>
 #include <unordered_map>
 #include <random>
+#include <algorithm>
 using namespace std;
 
 /* GLOBAL VARIABLES ********/

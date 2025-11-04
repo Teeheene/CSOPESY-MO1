@@ -49,6 +49,7 @@ public:
 	}
 
 	bool hasRemainingInstructions() {
+		lock_guard<mutex> lock(procMtx);
 		return instructionPointer < instructions.size();
 	}
 
