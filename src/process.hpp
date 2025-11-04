@@ -61,7 +61,8 @@ public:
 
 	Process() :
 		instructionPointer(0)
-	{}
+	{
+	}
 
 	void addInstruction(const string &instr) {
 		instructions.push_back(instr);

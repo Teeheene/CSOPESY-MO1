@@ -1,3 +1,5 @@
+#include "globals.hpp"
+
 class MainController
 {
 	string rawInput;
@@ -14,8 +16,6 @@ public:
 		Scheduler scheduler;
 		thread t;
 		int pid = 0;
-		int minIns = 0;
-		int maxIns = 0;
 
 		while (running)
 		{
@@ -74,12 +74,12 @@ public:
 					{
 						if (cmd.size() == 2)
 						{
-							scheduler.addProcess(createRandomProcess(pid++));
+							scheduler.addProcess(createRandomProcess());
 							//to implement
 						}
 						else
 						{
-							scheduler.addProcess(createRandomProcess(pid++));
+							scheduler.addProcess(createRandomProcess(cmd[2]));
 							//scheduler->enterProcessScreen(pTemp);
 						}
 					}
@@ -100,16 +100,16 @@ public:
 						}
 					}
 					else if (cmd[1] == "-ls") {
-						scheduler.state2();
+						scheduler.state();
 					}
 				}
 				else if (cmd[0] == "scheduler-start" || cmd[0] == "scheduler-test")
 				{
-					//scheduler.startTest();
+					scheduler.startTest();
 				}
 				else if (cmd[0] == "scheduler-stop")
 				{
-					//scheduler.stopTest();
+					scheduler.stopTest();
 				}
 				else if (cmd[0] == "report-util")
 				{

@@ -1,3 +1,4 @@
+
 struct Core {
 	int id;
 	atomic<bool> active;
@@ -22,29 +23,39 @@ class Scheduler {
 	string mode;
 	int quantum;
 	int cpuCycle;
-	int freqDelay;
+	int execDelay;
+	int batchFreq;
+	int minIns;
+	int maxIns;
+	
+	//
+	int freq;
 	atomic<bool> stop;
+	atomic<bool> test;
 
 public:
-	Scheduler(int cCount = 0, string m = "fcfs", int q = 3, int delay = 2000) :
-		coreCount(cCount),
-		mode(m),
-		quantum(q),
-		freqDelay(delay),
+	Scheduler() :
+		coreCount(0),
+		mode("fcfs"),
+		quantum(3),
+		execDelay(10),
 		cpuCycle(0),
-		stop(false)
-	{
-		/*cores.reserve(cCount);
-		for(int i = 0; i < coreCount; i++)
-			cores.emplace_back(make_unique<Core>(i)); //similar to push_back funct of vector
-																	*/
-	}
+		batchFreq(10),
+		minIns(5),
+		maxIns(10),
+		freq(0),
+		stop(false),
+		test(false)
+	{}
 
 	void configure(Config cfg) {
 		mode = cfg.scheduler;
 		quantum = cfg.quantumCycles;
-		freqDelay = cfg.delayExec;
+		execDelay = cfg.delayExec;
 		coreCount = cfg.numcpu;
+		batchFreq = cfg.batchFreq; 
+		minIns = cfg.minIns;
+		maxIns = cfg.maxIns;
 
 		cores.reserve(coreCount);
 		for(int i = 0; i < coreCount; i++) {
@@ -96,7 +107,7 @@ public:
 								lock_guard<mutex> lock(core->coreMtx);
 								core->current->executeNextInstruction(core->id);
 							}
-							this_thread::sleep_for(chrono::milliseconds(freqDelay));
+							this_thread::sleep_for(chrono::milliseconds(execDelay));
 						}
 						
 						//rr implementation later
@@ -126,50 +137,7 @@ public:
 		cout << "All cores stopped." << endl;
 	}
 
-	//debugging
 	void state() {
-		cout << "=============================" << endl;
-		cout << "Cycle: " << cpuCycle << endl;
-
-		for(auto &core : cores) {
-			//temporary values to store threaded core
-			int id;
-			Process* tempProcess;
-			bool isActive;
-
-			{
-				lock_guard<mutex> lock(core->coreMtx);
-				id = core->id;
-				tempProcess = core->current.get();
-				isActive = core->active;
-			}
-			if(isActive) {
-				cout << "[CORE " << id << "] Running Proc-" 
-					<< tempProcess->getPid() << " (" 
-					<< tempProcess->getInstructionPointer() << " / " 
-					<< tempProcess->getInstructionCount()
-					<< ")" << endl;
-			} else {
-				cout << "[CORE " << id << "] Idle" << endl;
-			}
-		}
-
-		{
-			lock_guard<mutex> lock(mtx);
-			cout << "Ready Queue: " << endl;
-			for(auto &proc : readyQueue) {
-				cout << "[PROC-" << proc->getPid() << "] Waiting..." << endl;
-			}
-			cout << "Finished Queue: " << endl;
-			for(auto &proc : finished) {
-				cout << "[PROC-" << proc->getPid() << "] Finished Running " 
-					<< proc->getInstructionCount() << " instructions." << endl;
-			}
-		}
-		cout << "=============================" << endl;
-	}
-
-	void state2() {
 		struct CoreSnapshot{
 			//core snap
 			int id;
@@ -209,7 +177,7 @@ public:
 			}
 		}
 
-		cout << "CPU utilization: " << (activeCount/coreCount*100) << "%" << endl;
+		cout << "CPU utilization: " << (1.0*activeCount/coreCount*100) << "%" << endl;
 		cout << "Cores used: " << activeCount << endl;
 		cout << "Cores available: " << (coreCount - activeCount) << endl
 			<< endl;
@@ -257,8 +225,27 @@ public:
 	void simulate() {
 		while(!stop) {
 			cpuCycle++;
+			if(test) {
+				freq++;	
+				if(freq >= batchFreq) {
+					lock_guard<mutex> lock(mtx);
+					unique_ptr<Process> proc = createRandomProcess();
+					readyQueue.push_back(move(proc));
+					freq = 0;
+				}
+			}
 			this_thread::sleep_for(chrono::milliseconds(100));
 		}
+	}
+
+	void startTest() {
+		freq = 0;
+		test = true;
+		cout << "Test has started..." << endl;
+	}
+
+	void stopTest() {
+		test = false;
 	}
 };
 

@@ -13,7 +13,7 @@
 using namespace std;
 
 /* GLOBAL VARIABLES ********/
-atomic<bool> running(true);
+atomic<bool> running(true);		
 /***************************/
 
 /* HEADERS *****************/

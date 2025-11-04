@@ -1,3 +1,4 @@
+#include "globals.hpp"
 /*
  * tokenizes the input
  *
@@ -31,14 +32,17 @@ vector<string> tokenizeInput(string input)
 }
 
 //basic random process generator 
-unique_ptr<Process> createRandomProcess(int pid, string name = "PROC-") {
+unique_ptr<Process> createRandomProcess(string name = "PROC-") {
 	static vector<string> ops = {"LOAD", "ADD", "SUB", "DECLARE"};
+
+	int pid = nextId.fetch_add(1);
+
 	if(name == "PROC-")
 		name += to_string(pid);
 	auto p = make_unique<Process>(pid, name);
 
 	srand(time(nullptr) + pid);
-	int len = rand() % 100 + 5; //about 5-14 instructions
+	int len = rand() % (maxIns - minIns + 1) + minIns; 
 
 	for(int i = 0; i < len; i++) {
 		int index = rand() % ops.size();
