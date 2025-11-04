@@ -19,8 +19,8 @@ atomic<bool> running(true);
 /* HEADERS *****************/
 #include "initialize.hpp"
 #include "process.hpp"
-#include "scheduler.hpp"
 #include "helper.hpp"
+#include "scheduler.hpp"
 #include "mainController.hpp"
 /****************************/
 

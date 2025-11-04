@@ -18,7 +18,7 @@ struct Log {
 		strftime(strTime, sizeof(strTime), "%m/%d/%Y %I:%M:%S%p", translTimestamp);
 
 		//print the log details
-		return "(" + string(strTime) + ")" + " Core:" + to_string(core) 
+		return "(" + strTime + ")" + " Core:" + core 
 			+ " \"" + instr + "\"\n";
 	}
 };
@@ -72,19 +72,22 @@ public:
 		cout << "ID: " << pid << endl;
 		cout << "Logs:" << endl;
 		for(const auto& log : logs) {
-			cout << log->toString();
+			cout << log->print();
 		}
 	}
 
-	string toStringLogs() {
+	void toStringLogs() {
 		lock_guard<mutex> lock(procMtx);
-		string result;
+		string logs = "";
 		for(const auto& log : logs) {
-			result += log->toString();
+			logs += log->print();
 		}
-		return result;
+		return logs
 	}
 
+	void toStringLogs() {
+
+	}
 	
 	//getters
 	string getName() { return name; }

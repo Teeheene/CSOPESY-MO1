@@ -1,18 +1,22 @@
 class MainController
 {
-	unique_ptr<Scheduler> scheduler;
 	string rawInput;
 	vector<string> cmd;
 	bool initialized;
 
 public:
-	MainController()
-	{
-		initialized = false;
-	}
+	MainController() :
+		initialized(false)
+	{}
 
 	void run()
-	{
+	{	
+		Scheduler scheduler;
+		thread t;
+		int pid = 0;
+		int minIns = 0;
+		int maxIns = 0;
+
 		while (running)
 		{
 			cout << "root:\\> ";
@@ -31,8 +35,16 @@ public:
 						std::cout << "configuration loaded successfully.\n\n";
 						cfg.print();
 						// initializes the scheduler
-						scheduler = make_unique<Scheduler>(cfg);
+						scheduler.configure(cfg);
+						scheduler.startScheduler();
+						//initialize instructions
+						minIns = cfg.minIns;
+						maxIns = cfg.maxIns;
+						std::cout << "scheduler started successfully.\n\n";
 						initialized = true;
+						
+						t = thread([&scheduler]() { scheduler.simulate(); });
+						t.detach();
 					}
 					else
 					{
@@ -62,13 +74,13 @@ public:
 					{
 						if (cmd.size() == 2)
 						{
+							scheduler.addProcess(createRandomProcess(pid++, minIns, maxIns));
 							//to implement
 						}
 						else
 						{
-							Process pTemp(cmd[2], 0);
-							scheduler->addProcess(pTemp);
-							scheduler->enterProcessScreen(pTemp);
+							scheduler.addProcess(createRandomProcess(pid++, minIns, maxIns, cmd[2]));
+							//scheduler->enterProcessScreen(pTemp);
 						}
 					}
 					else if (cmd[1] == "-r")
@@ -79,44 +91,24 @@ public:
 						}
 						else
 						{
-							optional<Process> pTemp = scheduler->searchProcess(cmd[2]);
-							if (pTemp)
-								scheduler->enterProcessScreen(*pTemp);
+							if(scheduler.processExists(cmd[2]))
+								cout << "tbi" << endl;
+								//scheduler->enterProcessScreen(*pTemp);
 							else
 								cout << "Process <" << cmd[2] << "> not found." << endl;
 						}
 					}
-					else if (cmd[1] == "-ls")
-					{
-						cout << "CPU utilization: " << endl;
-						cout << "Cores used: " << endl;
-						cout << "Cores available: " << endl
-							 << endl;
-						for (int i = 0; i <= 38; i++)
-						{
-							cout << "-";
-						}
-						cout << endl;
-						cout << "Running processes: " << endl;
-						// call scheduler function to show all running
-						cout << endl;
-						cout << "Finished processes: " << endl;
-						// call scheduler function to show all finished
-						for (int i = 0; i <= 38; i++)
-						{
-							cout << "-";
-						}
-						cout << endl
-							 << endl;
+					else if (cmd[1] == "-ls") {
+						scheduler.state();
 					}
 				}
 				else if (cmd[0] == "scheduler-start" || cmd[0] == "scheduler-test")
 				{
-					scheduler->startGeneration();
+					scheduler.startTest();
 				}
 				else if (cmd[0] == "scheduler-stop")
 				{
-					scheduler->stopGeneration();
+					scheduler.stopTest();
 				}
 				else if (cmd[0] == "report-util")
 				{

@@ -31,13 +31,13 @@ vector<string> tokenizeInput(string input)
 }
 
 //basic random process generator 
-unique_ptr<Process> createRandomProcess(int pid, int minIns, int maxIns) {
+unique_ptr<Process> createRandomProcess(int pid, int minIns, int maxIns, string name = "PROC-") {
 	static vector<string> ops = {"LOAD", "ADD", "SUB", "DECLARE"};
-	auto p = make_unique<Process>(pid);
+	auto p = make_unique<Process>(name, pid);
 	
 	//generates instructions depending on cfg
 	srand(time(nullptr) + pid);
-	int len = rand() % (maxIns - minIns + 1) + min; 
+	int len = rand() % (maxIns - minIns + 1) + minIns; 
 
 	for(int i = 0; i < len; i++) {
 		/*Instruction ins = generateRandomInstruction();

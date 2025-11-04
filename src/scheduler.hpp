@@ -26,34 +26,38 @@ class Scheduler
 	int quantum;
 	int execDelay;
 	int cpuCount;
+	int batchFreq; 
+	int freq;
+	int minIns;
+	int maxIns;
 	
 	//tick
 	int cpuCycle;
+	atomic<bool> test;
 
 public:
 	//debugging
-	Scheduler(int cpuCount_) : 
-		cpuCount(cpuCount_),
+	Scheduler() : 
+		cpuCount(0),
 		type("fcfs"),
 		quantum(3),
 		execDelay(2000),
+		batchFreq(10000),
+		freq(0),
 		cpuCycle(0),
-		stop(false)
-	{
-		cores.reserve(cpuCount);
-		for(int i = 0; i < cpuCount; i++) {
-			cores.emplace_back(make_unique<Core>(i));
-		}
-	}
+		stop(false),
+		test(false)
+	{}
 
-	Scheduler(Config cfg) : 
-		type(cfg.scheduler),
-		quantum(cfg.quantumCycles),
-		execDelay(cfg.delayExec),
-		cpuCount(cfg.numcpu),
-		cpuCycle(0),
-		stop(false)
-	{
+	void configure(Config cfg) {
+		type = cfg.scheduler;
+		quantum = cfg.quantumCycles;
+		execDelay = cfg.delayExec;
+		cpuCount = cfg.numcpu;
+		batchFreq = cfg.batchFreq;
+		minIns = cfg.minIns;
+		maxIns = cfg.maxIns;
+
 		cores.reserve(cpuCount);
 		for(int i = 0; i < cpuCount; i++) {
 			cores.emplace_back(make_unique<Core>(i));
@@ -63,7 +67,7 @@ public:
 	// pushes process into ready queue
 	void addProcess(unique_ptr<Process> process) {
 		lock_guard<mutex> lock(mtx);
-		readyQueue.push_back(process);
+		readyQueue.push_back(move(process));
 	};
 
 	// removes process at the front of ready queue and returns it
@@ -79,6 +83,59 @@ public:
 		return p;
 	}
 
+	void startScheduler() {
+		//threads for each core
+		for(auto &core : cores) {
+			//thread(...) in the background it will run the instr/ worker in the bg
+			//[this, &core] a lambad capt list, states which vars to use inside thread funct.
+			core->worker = thread([this, &core]() {
+				while(!stop) {
+					auto nextProc = getNextProcess();	
+					if(nextProc.has_value()) {
+						{
+							lock_guard<mutex> lock(core->coreMtx);
+							core->active = true;
+							core->current = move(nextProc.value());
+						}
+
+						//for limiting instruction time
+						int limit;
+						{
+							lock_guard<mutex> lock(core->coreMtx);
+							limit = (type == "rr") 
+								? min(quantum, core->current->getInstructionCount()) 
+								: core->current->getInstructionCount();
+						}
+
+						//fcfs implementation (this runs to completion)
+						for(int i = 0; i < limit && !stop; i++) {
+							{
+								lock_guard<mutex> lock(core->coreMtx);
+								core->current->executeNextInstruction(core->id);
+							}
+							this_thread::sleep_for(chrono::milliseconds(execDelay));
+						}
+						
+						//rr implementation later
+
+						{
+							lock_guard<mutex> lock(core->coreMtx);
+							lock_guard<mutex> lock2(mtx);
+							finished.push_back(move(core->current));
+						}
+
+						core->active = false;
+					} else {
+						this_thread::sleep_for(chrono::milliseconds(50));
+					}
+				} 
+			});
+			//end of thread
+		}
+	}
+
+
+	/*
 	void startScheduler() {
 		//threads for each core
 		for(auto &core : cores) {
@@ -105,7 +162,7 @@ public:
 							//		if proc has lower instr or quantum is less
 							//fcfs runs to completion
 							if(type == "rr") {
-								limit = min(quantum, core->current->getInstructionCount())
+								limit = min(quantum, core->current->getInstructionCount());
 							} else {
 								limit = core->current->getInstructionCount();
 							}
@@ -118,21 +175,27 @@ public:
 								//executes the instruction and moves the pointer
 								core->current->executeNextInstruction(core->id);
 							}
-							this_thread::sleep_for(chrono::milliseconds(freqDelay));
+							this_thread::sleep_for(chrono::milliseconds(execDelay));
+						}
+
+						unique_ptr<Process> procToMove;
+						bool shouldRequeue;
+						{
+							lock_guard<mutex> lock(core->coreMtx);
+							shouldRequeue = (core->current->hasRemainingInstructions() && type == "rr");
+							procToMove = move(core->current);
+							core->active = false;
 						}
 					
 						//either pushback in the queue or push into finished queue
-						{
-							lock_guard<mutex> lock(core->coreMtx);
-							if(core->current->hasRemainingInstruction() && mode == "rr") {
-								lock_guard<mutex> lock2(mtx);
-								readyQueue.push_back(move(core->current));	
+						if (procToMove) {
+							lock_guard<mutex> lock(mtx);
+							if(shouldRequeue) {
+								readyQueue.push_back(move(procToMove));	
 							} else {
-								finished.push_back(move(core->current));
+								finished.push_back(move(procToMove));
 							}
 						}
-
-						core->active = false;
 					} else {
 						this_thread::sleep_for(chrono::milliseconds(50));
 					}
@@ -141,6 +204,7 @@ public:
 			//end of thread
 		}
 	}
+	*/
 
 	void stopScheduler() {
 		stop = true;
@@ -151,62 +215,106 @@ public:
 		cout << "All cores stopped." << endl;
 	}
 	
-	void simulateCpuCycle() {
+	void simulate() {
 		while(!stop) {
 			cpuCycle++;
+			if(test) {
+				freq++;	
+				if(batchFreq % freq == 0) {
+					lock_guard<mutex> lock(mtx);
+					int id = readyQueue.back()->getPid() + 1;
+					addProcess(createRandomProcess(id, minIns, maxIns));
+				}
+			}
 			this_thread::sleep_for(chrono::milliseconds(100));
 		}
 	}
 
-	void enterProcessScreen(Process p)
-	{
-		string rawInput;
-		vector<string> cmd;
-
-		// clear screen
-		// cout << "\033[2J\033[1;1H";
-
-		while (true)
-		{
-			cout << "root:\\> ";
-			getline(cin, rawInput);
-			cmd = tokenizeInput(rawInput);
-
-			if (cmd[0] == "process-smi")
-			{
-				cout << endl;
-				cout << "Process name: " << p.getName() << endl;
-				cout << "ID: " << p.getId() << endl;
-				cout << "Logs:" << endl;
-				// implement ts ((timestamp) Core: N "instruction")
-				cout << "Current instruction Line: " << p.getCurrentInstructionLine() << endl;
-				cout << "Lines of code: " << p.getInstructionSize() << endl
-					 << endl;
-				// when finished print finished type shi
-			}
-			else if (cmd[0] == "exit")
-			{
-				cout << "Returning home..." << endl;
-				break;
-			}
-			else
-			{
-				cout << "Unknon command inside process screen." << endl;
-			}
-		}
-	}
-	optional<Process> searchProcess(string processName)
-	{
-		for (const auto &process : readyQueue)
-		{
-			if (process.getName() == processName)
-			{
-				return process;
-			}
-		}
-		return nullopt;
+	void startTest() {
+		freq = 0;
+		test = true;
 	}
 
+	void stopTest() {
+		test = false;
+	}
+
+	//debugging
+	/*
+	void state() {
+		struct CoreSnapshot{
+			//core snap
+			int id;
+			bool active;
+			//proc snap
+			string name;
+			int instrPointer;
+			int instrCount;
+			string logs;
+		};
+
+		int activeCount = 0;
+		vector<CoreSnapshot> coreSnapshot;
+
+		//snapshots the cores/ running processes
+		for(auto &core : cores) {
+			//temporary values to store threaded core
+			int id = -1;
+			bool isActive = false;
+			Process* proc;
+			{
+				lock_guard<mutex> lock(core->coreMtx);
+				id = core->id;
+				isActive = core->active;
+				if(isActive && core->current)
+					proc = core->current.get();
+			}
+			if(core->active) {
+				coreSnapshot.push_back({
+						core->id, 
+						true, 
+						proc->getName(),
+						proc->getInstructionPointer(),
+						proc->getInstructionCount(),
+						proc->toStringLogs()});
+				activeCount++;
+			}
+		}
+
+		cout << "CPU utilization: " << (activeCount/cpuCount*100) << "%" << endl;
+		cout << "Cores used: " << activeCount << endl;
+		cout << "Cores available: " << (cpuCount - activeCount) << endl
+			<< endl;
+		
+		for (int i = 0; i <= 38; i++) { cout << "-"; }
+		cout << endl;
+		//running processes
+		cout << "Running processes:" << endl;
+		for(auto &core : coreSnapshot) {
+			cout << core.name << "\t";
+			core.logs;
+			cout << "\tCore: " << core.id << "\t"
+				<< core.instrPointer << " / " 
+				<< core.instrCount << endl;
+		}
+
+		//finished processes
+		cout << "Finished processes: " << endl;
+		{
+			lock_guard<mutex> lock(mtx);
+			for(auto &proc : finished) {
+				cout << proc->getName() << "\t";
+				proc->printLogs();
+				cout << "\tFinished\t" 
+					<< proc->getInstructionPointer() << " / "
+					<< proc->getInstructionCount() << endl;
+
+			}
+		}
+		for (int i = 0; i <= 38; i++) { cout << "-"; }
+		cout << endl;
+	}
+	*/
 	//debugging
 	void state() {
 		cout << "=============================" << endl;
@@ -221,8 +329,8 @@ public:
 			{
 				lock_guard<mutex> lock(core->coreMtx);
 				id = core->id;
-				tempProcess = core->current.get();
 				isActive = core->active;
+				tempProcess = core->current.get();
 			}
 			if(isActive) {
 				cout << "[CORE " << id << "] Running Proc-" 
@@ -250,16 +358,72 @@ public:
 		cout << "=============================" << endl;
 	}
 
-	void searchProcess(int pid) {
-		lock_guard<mutex> lock(mtx);
+
+	bool processExists(string name) {
+		//search core/ running processes
 		for(auto &core : cores) {
-			lock_guard<mutex> lock(core->coreMtx);
-			if(core->current && core->current->getPid() == pid) {
-				cout << "PROC-" << pid << endl;
-				core->current->printLogs();
+			{
+				lock_guard<mutex> lock(core->coreMtx);
+				if(core->current->getName() == name) return true;
+			}
+		}
+		
+		//search ready and finished queue
+		{
+			lock_guard<mutex> lock(mtx);
+			for(auto &proc : readyQueue) {
+				if(proc->getName() == name) return true;
+			}
+
+			for(auto &proc : finished) {
+				if(proc->getName() == name) return true;
+			}
+		}
+
+		//if not found
+		return false;
+	}
+
+	/*
+	//processor screen
+	void enterProcessScreen(int pid)
+	{
+		string rawInput;
+		vector<string> cmd;
+
+		// clear screen
+		// cout << "\033[2J\033[1;1H";
+
+		while (true)
+		{
+			cout << "root:\\> ";
+			getline(cin, rawInput);
+			cmd = tokenizeInput(rawInput);
+
+			if (cmd[0] == "process-smi")
+			{
+				cout << endl;
+				cout << "Process name: " << p.getName() << endl;
+				cout << "ID: " << p.getId() << endl;
+				cout << "Logs:" << endl;
+				//fix ts
+				cout << "Current instruction Line: " << p.getCurrentInstructionLine() << endl;
+				cout << "Lines of code: " << p.getInstructionSize() << endl
+					 << endl;
+				// when finished print finished type shi
+			}
+			else if (cmd[0] == "exit")
+			{
+				cout << "Returning home..." << endl;
+				break;
+			}
+			else
+			{
+				cout << "Unknown command inside process screen." << endl;
 			}
 		}
 	}
+	*/
 };
 
 
