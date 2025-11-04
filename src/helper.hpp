@@ -31,9 +31,11 @@ vector<string> tokenizeInput(string input)
 }
 
 //basic random process generator 
-unique_ptr<Process> createRandomProcess(int pid) {
+unique_ptr<Process> createRandomProcess(int pid, string name = "PROC-") {
 	static vector<string> ops = {"LOAD", "ADD", "SUB", "DECLARE"};
-	auto p = make_unique<Process>(pid);
+	if(name == "PROC-")
+		name += to_string(pid);
+	auto p = make_unique<Process>(pid, name);
 
 	srand(time(nullptr) + pid);
 	int len = rand() % 100 + 5; //about 5-14 instructions

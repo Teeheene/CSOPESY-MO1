@@ -21,9 +21,31 @@ struct Log {
 		cout << "(" << strTime << ")" << " Core:" << core 
 			<< " \"" << instr << "\"" << endl;
 	}
+
+	string toStringTimestamp() {
+		//get timestamp adjusted to local time
+		char strTime[100];
+		tm* translTimestamp = localtime(&timestamp);
+		strftime(strTime, sizeof(strTime), "%m/%d/%Y %I:%M:%S%p", translTimestamp);
+
+		//print the log details
+		return "(" + string(strTime) + ")";
+	}
+
+	string toString() {
+		//get timestamp adjusted to local time
+		char strTime[100];
+		tm* translTimestamp = localtime(&timestamp);
+		strftime(strTime, sizeof(strTime), "%m/%d/%Y %I:%M:%S%p", translTimestamp);
+
+		//print the log details
+		return "(" + string(strTime) + ")" + " Core:" + to_string(core)
+			+ " \"" + instr + "\"\n";
+	}
 };
 
 class Process {
+	string name;
 	int pid;
 	int instructionPointer;
 	vector<string> instructions;
@@ -31,8 +53,9 @@ class Process {
 	mutex logMtx;
 
 public:
-	Process(int id) :
-		pid(id),
+	Process(int pid_, string name_) :
+		pid(pid),
+		name(name_),
 		instructionPointer(0)
 	{}
 
@@ -67,7 +90,22 @@ public:
 			log->print();
 		}
 	}
-	
+
+	string toStringRecentTimeLog() {
+		lock_guard<mutex> lock(logMtx);
+		return logs.back()->toStringTimestamp();
+	}
+
+	string toStringLogs() {
+		lock_guard<mutex> lock(logMtx);
+		string result;
+		for(const auto& log : logs) {
+			result += log->toString();
+		}
+		return result;
+	}
+
+	string getName() { return name; }
 	int getPid() { return pid; }
 	int getInstructionCount() { return instructions.size(); }
 	int getInstructionPointer() { return instructionPointer; }

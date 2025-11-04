@@ -100,7 +100,7 @@ public:
 						}
 					}
 					else if (cmd[1] == "-ls") {
-						scheduler.state();
+						scheduler.state2();
 					}
 				}
 				else if (cmd[0] == "scheduler-start" || cmd[0] == "scheduler-test")

@@ -169,6 +169,80 @@ public:
 		cout << "=============================" << endl;
 	}
 
+	void state2() {
+		struct CoreSnapshot{
+			//core snap
+			int id;
+			bool active;
+			//proc snap
+			string name;
+			int instrPointer;
+			int instrCount;
+			string logs;
+		};
+
+		int activeCount = 0;
+		vector<CoreSnapshot> coreSnapshot;
+
+		//snapshots the cores/ running processes
+		for(auto &core : cores) {
+			//temporary values to store threaded core
+			int id = -1;
+			bool isActive = false;
+			Process* proc;
+			{
+				lock_guard<mutex> lock(core->coreMtx);
+				id = core->id;
+				isActive = core->active;
+				if(isActive && core->current)
+					proc = core->current.get();
+			}
+			if(core->active) {
+				coreSnapshot.push_back({
+						core->id, 
+						true, 
+						proc->getName(),
+						proc->getInstructionPointer(),
+						proc->getInstructionCount(),
+						proc->toStringRecentTimeLog()});
+				activeCount++;
+			}
+		}
+
+		cout << "CPU utilization: " << (activeCount/coreCount*100) << "%" << endl;
+		cout << "Cores used: " << activeCount << endl;
+		cout << "Cores available: " << (coreCount - activeCount) << endl
+			<< endl;
+		
+		for (int i = 0; i <= 38; i++) { cout << "-"; }
+		cout << endl;
+		//running processes
+		cout << "Running processes:" << endl;
+		for(auto &core : coreSnapshot) {
+			cout << core.name << "\t" 
+				<< core.logs << "\tCore: " 
+				<< core.id << "\t"
+				<< core.instrPointer << " / " 
+				<< core.instrCount << endl;
+		}
+
+		//finished processes
+		cout << "Finished processes: " << endl;
+		{
+			lock_guard<mutex> lock(mtx);
+			for(auto &proc : finished) {
+				cout << proc->getName() << "\t"
+					<< proc->toStringRecentTimeLog() << "\tFinished\t" 
+					<< proc->getInstructionPointer() << " / "
+					<< proc->getInstructionCount() << endl;
+
+			}
+		}
+		for (int i = 0; i <= 38; i++) { cout << "-"; }
+		cout << endl;
+	}
+
+
 	void searchProcess(int pid) {
 		lock_guard<mutex> lock(mtx);
 		for(auto &core : cores) {
