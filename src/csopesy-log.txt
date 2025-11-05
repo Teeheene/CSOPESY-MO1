@@ -1,0 +1,10 @@
+CPU utilization: 0%
+Cores used: 0
+Cores available: 4
+
+---------------------------------------
+Running processes:
+Finished processes: 
+PROC-0	(11/05/2025 09:54:21AM)	Finished	1001 / 1201
+PROC-1	(11/05/2025 09:54:28AM)	Finished	1452 / 1719
+---------------------------------------

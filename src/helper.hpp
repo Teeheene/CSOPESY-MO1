@@ -38,7 +38,7 @@ vector<Instruction> processForLoop(int loopCount) {
 	
    vector<Instruction> loopBody;
    loopBody.push_back(Instruction("ADD", {"VAR1", "VAR1", "1"}));
-   loopBody.push_back(Instruction("PRINT",{"VAR 1 = "}));
+   loopBody.push_back(Instruction("PRINT",{"Hello World!"}));
 
 	for (int i = 0; i < loopCount; i++) {
    	for (const auto& instr : loopBody) {

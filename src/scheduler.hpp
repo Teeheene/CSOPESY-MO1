@@ -16,7 +16,9 @@ class Scheduler {
 	vector<unique_ptr<Core>> cores;	
 	vector<unique_ptr<Process>> readyQueue;
 	vector<unique_ptr<Process>> finished;
+	vector<unique_ptr<Process>> sleepingQueue;
 	mutex mtx;
+	mutex sleepMtx;
 
 	//cfg
 	int coreCount;
@@ -102,14 +104,28 @@ public:
 						}
 
 						//fcfs implementation (this runs to completion)
-						for(int i = 0; i < limit && !stop; i++) {
+						for(int i = 0; i < limit && !stop && mode == "fcfs"; i++) {
 							{
 								lock_guard<mutex> lock(core->coreMtx);
-								core->current->executeNextInstruction(core->id);
+								if(core->current->executeNextInstruction(core->id)) {
+									i--;
+								};
 							}
 							this_thread::sleep_for(chrono::milliseconds(execDelay));
 						}
-						
+
+						for(int i = 0; i < limit && !stop && mode == "rr"; i++) {
+							{
+								lock_guard<mutex> lock(core->coreMtx);
+								if(core->current->executeNextInstruction(core->id)) {
+									lock_guard<mutex> lock(sleepMtx);
+									sleepingQueue.push_back(move(core->current));	
+								};
+							}
+							this_thread::sleep_for(chrono::milliseconds(execDelay));
+						}
+
+
 						//rr implementation later
 
 						{
@@ -286,19 +302,24 @@ public:
 		return reportStream.str();
 	}
 
-	void searchProcess(int pid) {
-		lock_guard<mutex> lock(mtx);
-		for(auto &core : cores) {
-			lock_guard<mutex> lock(core->coreMtx);
-			if(core->current && core->current->getPid() == pid) {
-				cout << "PROC-" << pid << endl;
-				core->current->printLogs();
+	void tick() {
+		lock_guard<mutex> lock(sleepMtx);
+		for (int i = 0; i < sleepingQueue.size(); i++) {
+			Process* p = sleepingQueue[i].get();
+			p->decSleepTimer();
+
+			if (p->getSleepTimer() <= 0) {
+				readyQueue.push_back(move(sleepingQueue[i]));
+				sleepingQueue.erase(sleepingQueue.begin() + i); // safe erase
+			} else {
+				i++; // only increment if we didn’t erase
 			}
 		}
 	}
 
 	void simulate() {
 		while(!stop) {
+			tick();
 			cpuCycle++;
 			if(test) {
 				freq++;	
@@ -322,6 +343,83 @@ public:
 	void stopTest() {
 		test = false;
 	}
+
+	optional<Process*> searchProcess(string name) {
+		for(auto &core : cores) {
+			lock_guard<mutex> lock(core->coreMtx);
+			if(core->current && core->current->getName() == name) {
+				return core->current.get();
+			}
+		}
+
+		{
+			lock_guard<mutex> lock(mtx);
+			for(auto &proc : readyQueue) {
+				if(proc && proc->getName() == name) {
+					return proc.get();
+				}	
+			}
+
+			for(auto &proc : finished) {
+				if(proc && proc->getName() == name) {
+					return proc.get();
+				}	
+			}
+		}
+
+		return nullopt;
+	}
+
+	void enterProcessScreen(string name)
+	{
+		string rawInput;
+		vector<string> cmd;
+		bool screenDisplay = true;
+
+		auto rawProc = searchProcess(name);
+
+		if(!rawProc) {
+			cout << "Process <" << name << "> not found." << endl;
+			screenDisplay = false;
+		} else {
+			//clear screen
+			cout << "\033[2J\033[1;1H";
+		}
+
+		Process *p = *rawProc;
+		while (screenDisplay)
+		{
+			cout << "root:\\> ";
+			getline(cin, rawInput);
+			cmd = tokenizeInput(rawInput);
+
+			if (cmd[0] == "process-smi")
+			{
+				cout << endl;
+				cout << "Process name: " << p->getName() << endl;
+				cout << "ID: " << p->getPid() << endl;
+				cout << "Logs:" << endl << p->toStringLogs() << endl;
+				if(p->getInstructionPointer() != p->getInstructionCount()) {
+					cout << "Current instruction Line: " << p->getInstructionPointer() << endl;
+					cout << "Lines of code: " << p->getInstructionCount() << endl
+						<< endl;
+				} else {
+					cout << "Finished!" << endl
+						<< endl;
+				}
+			}
+			else if (cmd[0] == "exit")
+			{
+				cout << "Returning home..." << endl;
+				break;
+			}
+			else
+			{
+				cout << "Unknown command inside process screen." << endl;
+			}
+		}
+	}
+
 };
 
 

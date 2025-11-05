@@ -91,12 +91,7 @@ public:
 						}
 						else
 						{
-							/*if(scheduler.processExists(cmd[2]))
-								cout << "tbi" << endl;
-								//scheduler->enterProcessScreen(*pTemp);
-							else
-								cout << "Process <" << cmd[2] << "> not found." << endl;
-								*/
+							scheduler.enterProcessScreen(cmd[2]);
 						}
 					}
 					else if (cmd[1] == "-ls") {

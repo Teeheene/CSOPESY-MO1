@@ -15,7 +15,6 @@ struct Instruction {
 
     string getOutput() const {
         stringstream ss;
-        ss << operation;
         for (const auto& arg : arguments) {
             ss << " " << arg;
         }

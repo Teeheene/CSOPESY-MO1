@@ -90,13 +90,8 @@ public:
    	memory[key] = value; // <-- SAVES THE VALUE
    }
 
-	void executeNextInstruction(int core) {
-		if(!hasRemainingInstructions()) { return; }
-
-        if (sleepTimer > 0) {
-            sleepTimer--;
-            return;
-        }
+	int executeNextInstruction(int core) {
+		if(!hasRemainingInstructions()) { return 0; }
 
         Instruction instr = instructions[instructionPointer];
         
@@ -129,15 +124,25 @@ public:
 				logs.push_back(make_unique<Log>(core, instr.getOutput()));
         }
 	
-        else if (op == "SLEEP") { 
-            if (args.size() >= 1) {
-                sleepTimer = getValue(args[0]);
-            }
-        }
+			else if (op == "SLEEP") { 
+      		if (args.size() >= 1) {
+               sleepTimer = getValue(args[0]);
+					instructionPointer++;
+					return sleepTimer;
+   			}
+			}
         
 		instructionPointer++;
+		return 0;
 	}
 
+	void decSleepTimer() {
+		sleepTimer--;
+	}
+
+	int getSleepTimer() {
+		return sleepTimer;
+	}
 
 	void printLogs() {
 		lock_guard<mutex> lock(logMtx);
