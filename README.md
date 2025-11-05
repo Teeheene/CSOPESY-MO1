@@ -11,6 +11,8 @@ A process scheduler and CLI which simulates CPU process handling.
 - Jose, Yesha
 - Panganiban, Diane
 
+## Entry Class File
+- src/main.cpp
 
 ## How to run
 
