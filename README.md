@@ -8,6 +8,9 @@ Made by:
   Panganiban, Diane
 
 Running the Program:
+
   Compile program with: g++ main.cpp -o main
+
   Run the program with: main.exe
+  
   Note: First command must be "initialize" in order to unlock other commands
