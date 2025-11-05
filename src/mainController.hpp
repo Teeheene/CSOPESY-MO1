@@ -75,12 +75,12 @@ public:
 						if (cmd.size() == 2)
 						{
 							scheduler.addProcess(createRandomProcess());
-							//to implement
+							scheduler.enterProcessScreen(("PROC-"+to_string(nextId-1)));
 						}
 						else
 						{
 							scheduler.addProcess(createRandomProcess(cmd[2]));
-							//scheduler->enterProcessScreen(pTemp);
+							scheduler.enterProcessScreen(cmd[2]);
 						}
 					}
 					else if (cmd[1] == "-r")
