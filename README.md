@@ -1,11 +1,15 @@
-CSOPESY-MO1
-A process scheduler and CLI which simulates CPU process handling.
+CSOPESY-MO1: A process scheduler and CLI which simulates CPU process handling.
 
 Made by:
   Carlos, Gian
+  
   De Vera, Kenzo
+  
   Jose, Yesha
+  
   Panganiban, Diane
+
+
 
 Running the Program:
 
