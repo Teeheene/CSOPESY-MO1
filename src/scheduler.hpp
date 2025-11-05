@@ -24,6 +24,7 @@ class Scheduler {
 	string mode;
 	int quantum;
 	int cpuCycle;
+	int cpuCycleDelay;
 	int execDelay;
 	int batchFreq;
 	int minIns;
@@ -32,6 +33,7 @@ class Scheduler {
 	//
 	int freq;
 	atomic<bool> stop;
+	thread testThread;
 	atomic<bool> test;
 
 public:
@@ -41,6 +43,7 @@ public:
 		quantum(3),
 		execDelay(10),
 		cpuCycle(0),
+		cpuCycleDelay(1),
 		batchFreq(10),
 		minIns(5),
 		maxIns(10),
@@ -117,7 +120,7 @@ public:
 							{
 								lock_guard<mutex> lock(core->coreMtx);
 								if(core->current->executeNextInstruction(core->id)) {
-									break;
+									i--;
 								} 
 							}
 							this_thread::sleep_for(chrono::milliseconds(execDelay));
@@ -319,29 +322,33 @@ public:
 
 	void simulate() {
 		while(!stop) {
-			tick();
 			cpuCycle++;
-			if(test) {
-				freq++;	
+			this_thread::sleep_for(chrono::milliseconds(cpuCycleDelay));
+		}
+	}
+
+	void startTest() {
+		cout << "Test has started..." << endl;
+		test = true;
+		testThread = thread([&]() {
+			int freq = 0;
+			while(test) {
+				freq++;
 				if(freq >= batchFreq) {
 					lock_guard<mutex> lock(mtx);
 					unique_ptr<Process> proc = createRandomProcess();
 					readyQueue.push_back(move(proc));
 					freq = 0;
 				}
+				this_thread::sleep_for(chrono::milliseconds(batchFreq));
 			}
-			this_thread::sleep_for(chrono::milliseconds(100));
-		}
-	}
-
-	void startTest() {
-		freq = 0;
-		test = true;
-		cout << "Test has started..." << endl;
+		});
 	}
 
 	void stopTest() {
 		test = false;
+		if(testThread.joinable())
+			testThread.join();
 	}
 
 	optional<Process*> searchProcess(string name) {
