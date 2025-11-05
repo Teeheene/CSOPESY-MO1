@@ -92,6 +92,11 @@ public:
 
 	int executeNextInstruction(int core) {
 		if(!hasRemainingInstructions()) { return 0; }
+		
+		if(sleepTimer > 0) {
+			sleepTimer--;
+			return 1;
+		}
 
         Instruction instr = instructions[instructionPointer];
         

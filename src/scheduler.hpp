@@ -18,7 +18,6 @@ class Scheduler {
 	vector<unique_ptr<Process>> finished;
 	vector<unique_ptr<Process>> sleepingQueue;
 	mutex mtx;
-	mutex sleepMtx;
 
 	//cfg
 	int coreCount;
@@ -102,36 +101,37 @@ public:
 								? min(quantum, core->current->getInstructionCount()) 
 								: core->current->getInstructionCount();
 						}
-
-						//fcfs implementation (this runs to completion)
-						for(int i = 0; i < limit && !stop && mode == "fcfs"; i++) {
+						
+						//fcfs implementation (this runs to completion) 
+						for(int i = 0; i < limit && !stop && mode == "fcfs"; i++) { 
 							{
-								lock_guard<mutex> lock(core->coreMtx);
-								if(core->current->executeNextInstruction(core->id)) {
-									i--;
-								};
-							}
-							this_thread::sleep_for(chrono::milliseconds(execDelay));
-						}
+								lock_guard<mutex> lock(core->coreMtx); 
+								if(core->current->executeNextInstruction(core->id)) { 
+									i--; 
+								}; 
+							} 
+							this_thread::sleep_for(chrono::milliseconds(execDelay)); 
+						}							
 
 						for(int i = 0; i < limit && !stop && mode == "rr"; i++) {
 							{
 								lock_guard<mutex> lock(core->coreMtx);
 								if(core->current->executeNextInstruction(core->id)) {
-									lock_guard<mutex> lock(sleepMtx);
-									sleepingQueue.push_back(move(core->current));	
-								};
+									break;
+								} 
 							}
 							this_thread::sleep_for(chrono::milliseconds(execDelay));
 						}
 
-
-						//rr implementation later
-
 						{
 							lock_guard<mutex> lock(core->coreMtx);
 							lock_guard<mutex> lock2(mtx);
-							finished.push_back(move(core->current));
+							if(core->current->isAsleep())
+								sleepingQueue.push_back(move(core->current));	
+							else if(core->current->hasRemainingInstructions())
+								readyQueue.push_back(move(core->current));
+							else
+								finished.push_back(move(core->current));
 						}
 
 						core->active = false;
@@ -303,7 +303,7 @@ public:
 	}
 
 	void tick() {
-		lock_guard<mutex> lock(sleepMtx);
+		lock_guard<mutex> lock(mtx);
 		for (int i = 0; i < sleepingQueue.size(); i++) {
 			Process* p = sleepingQueue[i].get();
 			p->decSleepTimer();
@@ -364,6 +364,12 @@ public:
 				if(proc && proc->getName() == name) {
 					return proc.get();
 				}	
+			}
+
+			for(auto &proc : sleepingQueue) {
+				if(proc && proc->getName() == name) {
+					return proc.get();
+				}
 			}
 		}
 
