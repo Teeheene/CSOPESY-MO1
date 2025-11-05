@@ -48,6 +48,7 @@ class Process {
 	string name;
 	int pid;
 	int instructionPointer;
+	int sleepTimer;
 	vector<string> instructions;
 	vector<unique_ptr<Log>> logs;
 	mutex logMtx;
@@ -56,15 +57,16 @@ public:
 	Process(int pid_, string name_) :
 		pid(pid),
 		name(name_),
-		instructionPointer(0)
+		instructionPointer(0),
+		sleepTimer(0)
 	{}
 
 	Process() :
-		instructionPointer(0)
-	{
-	}
+		instructionPointer(0),
+		sleepTimer(0)
+	{}
 
-	void addInstruction(const string &instr) {
+	void addInstruction(const Instruction &instr) {
 		instructions.push_back(instr);
 	}
 
@@ -72,16 +74,69 @@ public:
 		return instructionPointer < instructions.size();
 	}
 
+   int getValue(const string& key) {
+      if (memory.find(key) != memory.end()) {
+         return memory[key];
+   	}
+      try {
+         return stoi(key); 
+      } catch (...) {
+         return 0; // Default to 0
+      }
+   }
+
+   void setValue(const string& key, int value) {
+   	memory[key] = value; // <-- SAVES THE VALUE
+   }
+
 	void executeNextInstruction(int core) {
-		lock_guard<mutex> lock(logMtx);
 		if(!hasRemainingInstructions()) { return; }
 
-		//log the current instruction
-		logs.push_back(make_unique<Log>(core, instructions[instructionPointer]));
+        if (sleepTimer > 0) {
+            sleepTimer--;
+            return;
+        }
 
-		//move the pointer forward
+        Instruction instr = instructions[instructionPointer];
+        
+        const string& op = instr.operation;
+        const vector<string>& args = instr.arguments;
+        
+        if (op == "DECLARE") {
+            if (args.size() >= 1) {
+                int initialValue = (args.size() >= 2) ? getValue(args[1]) : 0;
+                setValue(args[0], initialValue); 
+            }
+        } 
+        else if (op == "ADD") {
+            if (args.size() >= 3) {
+                int val2 = getValue(args[1]);
+                int val3 = getValue(args[2]);
+                int result = val2 + val3;
+                setValue(args[0], result);
+            }
+        }
+        else if (op == "SUBTRACT") {
+            if (args.size() >= 3) {
+                int val2 = getValue(args[1]);
+                int val3 = getValue(args[2]);
+                int result = val2 - val3;
+                setValue(args[0], result);
+            }
+        }
+        else if (op == "PRINT") {
+				logs.push_back(make_unique<Log>(core, getValue(args[0])));
+        }
+	
+        else if (op == "SLEEP") { 
+            if (args.size() >= 1) {
+                sleepTimer = getValue(args[0]);
+            }
+        }
+        
 		instructionPointer++;
 	}
+
 
 	void printLogs() {
 		lock_guard<mutex> lock(logMtx);
@@ -110,6 +165,7 @@ public:
 	int getPid() { return pid; }
 	int getInstructionCount() { return instructions.size(); }
 	int getInstructionPointer() { return instructionPointer; }
+	bool isAsleep() { return sleepTimer > 0; }
 };
 
 
