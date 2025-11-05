@@ -43,7 +43,7 @@ public:
 		quantum(3),
 		execDelay(10),
 		cpuCycle(0),
-		cpuCycleDelay(1),
+		cpuCycleDelay(100000),
 		batchFreq(10),
 		minIns(5),
 		maxIns(10),
@@ -129,15 +129,14 @@ public:
 						{
 							lock_guard<mutex> lock(core->coreMtx);
 							lock_guard<mutex> lock2(mtx);
-							if(core->current->isAsleep())
-								sleepingQueue.push_back(move(core->current));	
-							else if(core->current->hasRemainingInstructions())
+							if(core->current->hasRemainingInstructions())
 								readyQueue.push_back(move(core->current));
 							else
 								finished.push_back(move(core->current));
+
+							core->active = false;
 						}
 
-						core->active = false;
 					} else {
 						this_thread::sleep_for(chrono::milliseconds(50));
 					}

@@ -70,8 +70,8 @@ vector<Instruction> generateRandomInstruction() {
       args.push_back((rand() % 2 == 0) ? var3 : literal); 
    } else if (op == "PRINT") {
       args.push_back("Hello World!");
-   } else if (op == "SLEEP") {
-      args.push_back(to_string(rand() % 3 + 1)); 
+//   } else if (op == "SLEEP") {
+//      args.push_back(to_string(rand() % 3 + 1)); 
    } else if (op == "FOR") {
 		int loopCount = rand() % 3 + 1;
 		instructions = processForLoop(loopCount);
