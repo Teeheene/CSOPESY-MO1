@@ -13,7 +13,7 @@ struct Instruction {
     Instruction(const string& op, const vector<string>& args = {})
         : operation(op), arguments(args) {}
 
-    string toString() const {
+    string getOutput() const {
         stringstream ss;
         ss << operation;
         for (const auto& arg : arguments) {

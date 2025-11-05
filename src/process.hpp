@@ -49,7 +49,8 @@ class Process {
 	int pid;
 	int instructionPointer;
 	int sleepTimer;
-	vector<string> instructions;
+	map<string, int> memory;
+	vector<Instruction> instructions;
 	vector<unique_ptr<Log>> logs;
 	mutex logMtx;
 
@@ -125,7 +126,7 @@ public:
             }
         }
         else if (op == "PRINT") {
-				logs.push_back(make_unique<Log>(core, getValue(args[0])));
+				logs.push_back(make_unique<Log>(core, instr.getOutput()));
         }
 	
         else if (op == "SLEEP") { 

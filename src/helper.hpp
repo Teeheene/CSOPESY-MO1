@@ -31,6 +31,23 @@ vector<string> tokenizeInput(string input)
 	return tokens;
 }
 
+vector<Instruction> processForLoop(int loopCount) {
+   vector<Instruction> loopInstructions;
+
+   loopInstructions.push_back(Instruction("FOR", {"ADD, PRINT"}));
+	
+   vector<Instruction> loopBody;
+   loopBody.push_back(Instruction("ADD", {"VAR1", "VAR1", "1"}));
+   loopBody.push_back(Instruction("PRINT",{"VAR 1 = "}));
+
+	for (int i = 0; i < loopCount; i++) {
+   	for (const auto& instr : loopBody) {
+			loopInstructions.push_back(instr);
+      }
+   }
+
+   return loopInstructions;
+}
 
 vector<Instruction> generateRandomInstruction() {
 	static vector<string> ops = {"DECLARE", "ADD", "SUBTRACT", "PRINT", "SLEEP", "FOR"};
@@ -52,7 +69,7 @@ vector<Instruction> generateRandomInstruction() {
       args.push_back(var2); 
       args.push_back((rand() % 2 == 0) ? var3 : literal); 
    } else if (op == "PRINT") {
-      args.push_back("Hello World from ");
+      args.push_back("Hello World!");
    } else if (op == "SLEEP") {
       args.push_back(to_string(rand() % 3 + 1)); 
    } else if (op == "FOR") {
@@ -66,23 +83,6 @@ vector<Instruction> generateRandomInstruction() {
 	return instructions;
 }
 
-vector<Instruction> processForLoop(int loopCount) {
-   vector<Instruction> loopInstructions;
-
-   loopInstructions.push_back(Instruction("FOR", {"ADD, PRINT"}));
-	
-   vector<Instruction> loopBody;
-   loopBody.push_back(Instruction("ADD", {"VAR1", "VAR1", "1"}));
-   loopBody.push_back(Instruction("PRINT",{"VAR 1 = "}));
-
-	for (int i = 0; i < loopCount; i++) {
-   	for (const auto& instr : loopBody) {
-			loopInstructions.push_back(instr);
-      }
-   }
-
-   return loopInstructions;
-}
 
 //basic random process generator 
 unique_ptr<Process> createRandomProcess(string name = "PROC-") {
@@ -97,7 +97,7 @@ unique_ptr<Process> createRandomProcess(string name = "PROC-") {
 
 	for(int i = 0; i < len; i++) {
 		vector<Instruction> instr = generateRandomInstruction();
-		for(autp& i : Instruction) {
+		for(auto& i : instr) {
 			p->addInstruction(i);
 		}
 		if(instr.size() > 1) {
