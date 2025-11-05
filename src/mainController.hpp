@@ -113,7 +113,8 @@ public:
 				}
 				else if (cmd[0] == "report-util")
 				{
-					// generate CPU util report
+					handleReportCommand(scheduler);
+					cout << "report file created at ./csopesy-log.txt" << endl;
 				}
 				else if (cmd[0] == "exit")
 				{
@@ -127,6 +128,15 @@ public:
 			}
 		}
 	}
+
+	void handleReportCommand(Scheduler& scheduler) {
+    
+    std::string report = scheduler.reportUtil();
+
+    std::ofstream outFile("csopesy-log.txt");
+    outFile << report;
+    outFile.close();
+}
 };
 
 

@@ -210,6 +210,81 @@ public:
 		cout << endl;
 	}
 
+	string reportUtil() {
+		
+		stringstream reportStream;
+
+		struct CoreSnapshot{
+			int id;
+			bool active;
+			string name;
+			int instrPointer;
+			int instrCount;
+			string logs;
+		};
+
+		int activeCount = 0;
+		vector<CoreSnapshot> coreSnapshot;
+
+		for(auto &core : cores) {
+			int id = -1;
+			bool isActive = false;
+			Process* proc = nullptr; 
+			{
+				lock_guard<mutex> lock(core->coreMtx);
+				id = core->id;
+				isActive = core->active;
+				if(isActive && core->current)
+					proc = core->current.get();
+			}
+			
+			if(isActive) { 
+				if (proc) {
+					coreSnapshot.push_back({
+							id, 
+							true, 
+							proc->getName(),
+							proc->getInstructionPointer(),
+							proc->getInstructionCount(),
+							proc->toStringRecentTimeLog()});
+					activeCount++;
+				}
+			}
+		}
+
+		reportStream << "CPU utilization: " << (1.0*activeCount/coreCount*100) << "%" << endl;
+		reportStream << "Cores used: " << activeCount << endl;
+		reportStream << "Cores available: " << (coreCount - activeCount) << endl
+					<< endl;
+		
+		for (int i = 0; i <= 38; i++) { reportStream << "-"; }
+		reportStream << endl;
+		
+		reportStream << "Running processes:" << endl;
+		for(auto &core : coreSnapshot) {
+			reportStream << core.name << "\t" 
+						<< core.logs << "\tCore: " 
+						<< core.id << "\t"
+						<< core.instrPointer << " / " 
+						<< core.instrCount << endl;
+		}
+
+		reportStream << "Finished processes: " << endl;
+		{
+			lock_guard<mutex> lock(mtx);
+			for(auto &proc : finished) {
+				reportStream << proc->getName() << "\t"
+							<< proc->toStringRecentTimeLog() << "\tFinished\t" 
+							<< proc->getInstructionPointer() << " / "
+							<< proc->getInstructionCount() << endl;
+
+			}
+		}
+		for (int i = 0; i <= 38; i++) { reportStream << "-"; }
+		reportStream << endl;
+
+		return reportStream.str();
+	}
 
 	void searchProcess(int pid) {
 		lock_guard<mutex> lock(mtx);
